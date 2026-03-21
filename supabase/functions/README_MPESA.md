@@ -42,7 +42,17 @@ Set **Shop Settings → M-Pesa Callback URL** to:
 
 Register the **same URL** in the **Safaricom Daraja** portal as the Lipa Na M-Pesa Online / STK callback URL.
 
-## 4. Flutter
+## 4. Shortcode, Till, and sandbox
+
+- **Sandbox:** Turn on **Sandbox** in Shop Settings (or set `mpesa_is_sandbox` in `shop_configs`). The Edge Function then calls `https://sandbox.safaricom.co.ke`. Using **production** Daraja (`api.safaricom.co.ke`) with **sandbox** consumer keys causes errors such as **500.001.1001 — Merchant does not exist**.
+- **Buy Goods:** Put the **Paybill / head office shortcode** in **Shortcode** and the **Till number** in **Till Number**. The passkey in Daraja is tied to the shortcode; `PartyB` in STK must be the Till when both differ.
+- **Pay Bill:** Use transaction type **CustomerPayBillOnline**; shortcode is the Paybill; `PartyB` matches Paybill.
+
+Redeploy after changing `mpesa-stk-push/index.ts`:
+
+`supabase functions deploy mpesa-stk-push`
+
+## 5. Flutter
 
 - `lib/features/mpesa/mpesa_service.dart` — `MpesaService.pay()` (used from checkout).  
 - `lib/features/sale/data/mpesa_repository.dart` — invokes `mpesa-stk-push` and polls `mpesa_callback_results`.

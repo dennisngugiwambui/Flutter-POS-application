@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_page.dart';
-import '../../dashboard/presentation/main_shell.dart';
+import '../../dashboard/presentation/shell_router.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -52,7 +52,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, a, b) => session != null ? const MainShell() : const LoginPage(),
+        pageBuilder: (context, a, b) => session != null ? const ShellRouter() : const LoginPage(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },

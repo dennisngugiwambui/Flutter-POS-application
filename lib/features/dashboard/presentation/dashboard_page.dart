@@ -5,6 +5,7 @@ import '../../../core/ui_components.dart';
 import '../../../core/money_format.dart';
 import '../../../dashboard_provider.dart';
 import 'main_shell.dart';
+import 'notifications_sheet.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -18,14 +19,18 @@ class DashboardPage extends ConsumerWidget {
       backgroundColor: kBg,
       body: CustomScrollView(
         slivers: [
-          // ── Top bar ────────────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                 child: Row(
                   children: [
+                    TopIconBtn(
+                      icon: Icons.menu_rounded,
+                      onTap: () => MainShell.shellScaffoldKey.currentState?.openDrawer(),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: profileAsync.when(
                         data: (p) => Column(
@@ -43,10 +48,10 @@ class DashboardPage extends ConsumerWidget {
                             Text(
                               p?.fullName.split(' ').first ?? 'there',
                               style: const TextStyle(
-                                fontSize: 26,
+                                fontSize: 28,
                                 fontWeight: FontWeight.w900,
                                 color: kText,
-                                letterSpacing: -0.7,
+                                letterSpacing: -0.8,
                                 height: 1.1,
                               ),
                             ),
@@ -61,58 +66,79 @@ class DashboardPage extends ConsumerWidget {
                     ),
                     TopIconBtn(
                       icon: Icons.notifications_outlined,
-                      onTap: () {},
+                      onTap: () => showNotificationsSheet(context),
                     ),
                   ],
                 ),
               ),
             ),
           ),
-
-          // ── Hero banner ────────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: _HeroBanner(statsAsync: statsAsync),
             ),
           ),
-
-          // ── Stats 2×2 grid ─────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
               child: statsAsync.when(
-                data: (stats) => GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 1.65,
+                data: (stats) => Column(
                   children: [
-                    StatCard(
-                      label: 'Total Sales',
-                      value: formatKes(stats.totalSales, fractionDigits: 0),
-                      icon: Icons.trending_up_rounded,
-                      color: kPrimary,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _RichStatCard(
+                            label: 'Total Sales',
+                            value: formatKes(stats.totalSales, fractionDigits: 0),
+                            icon: Icons.trending_up_rounded,
+                            color: kPrimary,
+                            sub: 'All time revenue',
+                            trend: '+12%',
+                            trendUp: true,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _RichStatCard(
+                            label: 'Orders Today',
+                            value: '${stats.ordersToday}',
+                            icon: Icons.receipt_long_rounded,
+                            color: kAccent,
+                            sub: 'Transactions',
+                            trend: 'Today',
+                            trendUp: true,
+                          ),
+                        ),
+                      ],
                     ),
-                    StatCard(
-                      label: 'Orders Today',
-                      value: '${stats.ordersToday}',
-                      icon: Icons.receipt_long_rounded,
-                      color: kAccent,
-                    ),
-                    StatCard(
-                      label: 'Products',
-                      value: '${stats.productsCount}',
-                      icon: Icons.inventory_2_rounded,
-                      color: kWarning,
-                    ),
-                    StatCard(
-                      label: 'Low Stock',
-                      value: '${stats.lowStockCount}',
-                      icon: Icons.warning_amber_rounded,
-                      color: kError,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _RichStatCard(
+                            label: 'Products',
+                            value: '${stats.productsCount}',
+                            icon: Icons.inventory_2_rounded,
+                            color: kWarning,
+                            sub: 'In catalogue',
+                            trend: 'Active',
+                            trendUp: true,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _RichStatCard(
+                            label: 'Low Stock',
+                            value: '${stats.lowStockCount}',
+                            icon: Icons.warning_amber_rounded,
+                            color: kError,
+                            sub: 'Need restock',
+                            trend: 'Alert',
+                            trendUp: false,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -122,18 +148,18 @@ class DashboardPage extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 1.65,
+                  childAspectRatio: 1.4,
                   children: List.generate(
                     4,
                     (_) => Container(
                       decoration: BoxDecoration(
-                        color: kSurface2,
+                        color: kSurface,
                         borderRadius: BorderRadius.circular(22),
                       ),
                       child: const Center(
                         child: SizedBox(
-                          width: 22,
-                          height: 22,
+                          width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
                         ),
                       ),
@@ -144,8 +170,6 @@ class DashboardPage extends ConsumerWidget {
               ),
             ),
           ),
-
-          // ── Quick actions ──────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
@@ -159,8 +183,6 @@ class DashboardPage extends ConsumerWidget {
               ),
             ),
           ),
-
-          // ── Recent activity ────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
@@ -174,7 +196,6 @@ class DashboardPage extends ConsumerWidget {
               ),
             ),
           ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
@@ -189,28 +210,120 @@ class DashboardPage extends ConsumerWidget {
   }
 }
 
-// ── Hero banner ────────────────────────────────────────────────────────────────
+class _RichStatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String sub;
+  final String trend;
+  final IconData icon;
+  final Color color;
+  final bool trendUp;
+
+  const _RichStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.sub,
+    required this.trend,
+    required this.trendUp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: kBorder, width: 0.9),
+        boxShadow: const [
+          BoxShadow(color: Color(0x080A2018), blurRadius: 16, offset: Offset(0, 5)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color.withAlpha(40), color.withAlpha(15)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (trendUp ? kPrimary : kError).withAlpha(15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      trendUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                      size: 10,
+                      color: trendUp ? kPrimary : kError,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      trend,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: trendUp ? kPrimary : kError,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: color,
+              letterSpacing: -0.5,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: kText,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(sub, style: const TextStyle(fontSize: 10, color: kTextMuted)),
+        ],
+      ),
+    );
+  }
+}
+
 class _HeroBanner extends StatelessWidget {
   final AsyncValue<DashboardStatsData> statsAsync;
   const _HeroBanner({required this.statsAsync});
 
   @override
   Widget build(BuildContext context) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final now = DateTime.now();
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
     final dateStr = '${months[now.month - 1]} ${now.day}, ${now.year}';
 
     return Container(
@@ -223,11 +336,7 @@ class _HeroBanner extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
-          BoxShadow(
-            color: kPrimary.withAlpha(70),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-          ),
+          BoxShadow(color: kPrimary.withAlpha(70), blurRadius: 28, offset: const Offset(0, 10)),
         ],
       ),
       child: Stack(
@@ -238,10 +347,7 @@ class _HeroBanner extends StatelessWidget {
             child: Container(
               width: 100,
               height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withAlpha(18),
-              ),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withAlpha(18)),
             ),
           ),
           Positioned(
@@ -250,10 +356,7 @@ class _HeroBanner extends StatelessWidget {
             child: Container(
               width: 64,
               height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withAlpha(10),
-              ),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withAlpha(10)),
             ),
           ),
           Row(
@@ -271,7 +374,7 @@ class _HeroBanner extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.storefront_rounded, color: Colors.white, size: 14),
+                          Icon(Icons.storefront_rounded, color: Colors.white, size: 13),
                           SizedBox(width: 5),
                           Text(
                             'POS System',
@@ -344,7 +447,6 @@ class _HeroBanner extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 4),
                       Text(
                         'today',
                         style: TextStyle(
@@ -367,7 +469,6 @@ class _HeroBanner extends StatelessWidget {
   }
 }
 
-// ── Quick actions grid ─────────────────────────────────────────────────────────
 class _QuickActionsGrid extends StatelessWidget {
   final WidgetRef ref;
   const _QuickActionsGrid({required this.ref});
@@ -401,16 +502,8 @@ class _QuickActionsGrid extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: a.color.withAlpha(45), width: 0.9),
           boxShadow: [
-            BoxShadow(
-              color: a.color.withAlpha(15),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-            const BoxShadow(
-              color: Color(0x080A2018),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
+            BoxShadow(color: a.color.withAlpha(15), blurRadius: 12, offset: const Offset(0, 4)),
+            const BoxShadow(color: Color(0x080A2018), blurRadius: 8, offset: Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -421,7 +514,7 @@ class _QuickActionsGrid extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: a.color.withAlpha(22),
+                color: a.color.withAlpha(18),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(a.icon, color: a.color, size: 20),
@@ -443,11 +536,7 @@ class _QuickActionsGrid extends StatelessWidget {
                   children: [
                     Text(
                       'Open',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: a.color,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: TextStyle(fontSize: 10, color: a.color, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 2),
                     Icon(Icons.arrow_forward_rounded, size: 10, color: a.color),
@@ -470,7 +559,6 @@ class _QA {
   const _QA(this.label, this.icon, this.color, this.onTap);
 }
 
-// ── Recent activity ────────────────────────────────────────────────────────────
 class _RecentActivity extends StatelessWidget {
   final AsyncValue<DashboardStatsData> statsAsync;
   const _RecentActivity({required this.statsAsync});
@@ -510,7 +598,7 @@ class _RecentActivity extends StatelessWidget {
         return Column(
           children: [
             if (stats.ordersToday > 0)
-              _activityRow(
+              _row(
                 icon: Icons.receipt_rounded,
                 color: kPrimary,
                 title: '${stats.ordersToday} sale${stats.ordersToday > 1 ? 's' : ''} today',
@@ -520,12 +608,12 @@ class _RecentActivity extends StatelessWidget {
               ),
             if (stats.lowStockCount > 0) ...[
               const SizedBox(height: 10),
-              _activityRow(
+              _row(
                 icon: Icons.warning_amber_rounded,
                 color: kError,
                 title: '${stats.lowStockCount} item${stats.lowStockCount > 1 ? 's' : ''} low on stock',
-                sub: 'Review your inventory',
-                badge: 'Action needed',
+                sub: 'Review inventory',
+                badge: 'Alert',
                 badgeColor: kError,
               ),
             ],
@@ -533,20 +621,17 @@ class _RecentActivity extends StatelessWidget {
         );
       },
       loading: () => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2),
-          ),
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2),
         ),
       ),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
 
-  Widget _activityRow({
+  Widget _row({
     required IconData icon,
     required Color color,
     required String title,
@@ -562,7 +647,7 @@ class _RecentActivity extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: color.withAlpha(22),
+              color: color.withAlpha(18),
               borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(icon, color: color, size: 20),

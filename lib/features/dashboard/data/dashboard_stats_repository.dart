@@ -1,10 +1,12 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../products/data/product_repository.dart';
+import '../../sale/data/sales_repository.dart';
 import '../../sale/domain/cart_item_model.dart';
 
 class DashboardStatsRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
   final ProductRepository _productRepo = ProductRepository();
+  final SalesRepository _salesRepo = SalesRepository();
 
   Future<int> getProductsCount() async {
     final list = await _productRepo.getProducts();
@@ -41,24 +43,10 @@ class DashboardStatsRepository {
 
   /// Records a sale and its line items (for sales history detail).
   Future<void> recordSale(double totalAmount, List<CartItemModel> items) async {
-    final userId = _supabase.auth.currentUser?.id;
-    final salesRes = await _supabase.from('sales').insert({
-      'total_amount': totalAmount,
-      if (userId != null) 'created_by': userId,
-    }).select('id').single();
-    final saleId = salesRes['id'] as String?;
-    if (saleId == null || items.isEmpty) return;
-    for (final item in items) {
-      await _supabase.from('sale_items').insert({
-        'sale_id': saleId,
-        'product_id': item.product.id,
-        'product_name': item.product.name,
-        'barcode': item.product.barcode,
-        'quantity': item.quantity,
-        'unit_price': item.product.sellingPrice,
-        'total_price': item.totalPrice,
-        'image_url': item.product.imageUrl,
-      });
-    }
+    await _salesRepo.recordSale(
+      totalAmount: totalAmount,
+      items: items,
+      paymentMethod: 'cash',
+    );
   }
 }

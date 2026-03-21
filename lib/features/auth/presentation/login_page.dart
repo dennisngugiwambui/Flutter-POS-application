@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import 'register_page.dart';
-import '../../dashboard/presentation/main_shell.dart';
+import '../../dashboard/presentation/shell_router.dart';
 import '../../../dashboard_provider.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -57,6 +57,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
         emailOrPhone: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      ref.invalidate(profileProvider);
 
       // Block pending/inactive users from entering the app.
       try {
@@ -80,7 +81,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, a, b) => const MainShell(),
+            pageBuilder: (context, a, b) => const ShellRouter(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) =>
                 FadeTransition(opacity: animation, child: child),
             transitionDuration: const Duration(milliseconds: 500),
@@ -200,7 +201,21 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(height: 36),
+                            const SizedBox(height: 10),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                'Same sign-in for everyone. After login you are taken to the screen for your role (admin, manager, cashier, or client).',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 22),
                             // White form card
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),

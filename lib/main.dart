@@ -6,6 +6,7 @@ import 'core/supabase_config.dart';
 import 'core/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/auth/presentation/splash_page.dart';
+import 'features/auth/presentation/login_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +43,9 @@ class PosApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
       home: const SplashPage(),
+      routes: {
+        '/login': (context) => const LoginPage(),
+      },
     );
   }
 }

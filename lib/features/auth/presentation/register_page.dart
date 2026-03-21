@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
-import '../../dashboard/presentation/main_shell.dart';
+import '../../../dashboard_provider.dart';
+import '../../dashboard/presentation/shell_router.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -18,6 +19,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> with TickerProvider
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  /// Null until [has_admin_user] RPC returns; drives copy (first admin vs client-only).
+  bool? _hasAdmin;
+  String? _bootstrapError;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -37,6 +41,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> with TickerProvider
       CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
     _animController.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBootstrap());
+  }
+
+  Future<void> _loadBootstrap() async {
+    try {
+      final v = await ref.read(authRepositoryProvider).hasAdminUser();
+      if (mounted) setState(() => _hasAdmin = v);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _bootstrapError =
+              'Could not check shop setup. Run the latest SQL migration (has_admin_user) or try again.';
+        });
+      }
+    }
   }
 
   @override
@@ -55,17 +74,60 @@ class _RegisterPageState extends ConsumerState<RegisterPage> with TickerProvider
 
     setState(() => _isLoading = true);
     try {
-      await ref.read(authRepositoryProvider).signUp(
+      final repo = ref.read(authRepositoryProvider);
+      final avail = await repo.registrationAvailability(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
-        name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
       );
+      if (avail.emailTaken) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('This email is already registered. Use Sign In or a different email.'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+        return;
+      }
+      if (avail.phoneTaken) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('This phone number is already used by another account.'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+        return;
+      }
+
+      final hasAdmin = await repo.hasAdminUser();
+      if (hasAdmin) {
+        await repo.signUpClient(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+        );
+      } else {
+        await repo.signUpShopOwner(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+        );
+      }
+      ref.invalidate(profileProvider);
       if (mounted) {
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, a, b) => const MainShell(),
+            pageBuilder: (context, a, b) => const ShellRouter(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) =>
                 FadeTransition(opacity: animation, child: child),
             transitionDuration: const Duration(milliseconds: 500),
@@ -75,7 +137,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> with TickerProvider
     } catch (e) {
       if (mounted) {
         String msg = e.toString();
-        if (msg.contains('already registered')) msg = 'This email/phone is already registered.';
+        if (msg.contains('already registered') ||
+            msg.contains('User already registered') ||
+            msg.contains('already been registered')) {
+          msg = 'This email is already registered. Use Sign In.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
@@ -197,7 +263,42 @@ class _RegisterPageState extends ConsumerState<RegisterPage> with TickerProvider
                                 letterSpacing: 0.8,
                               ),
                             ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 10),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: _bootstrapError != null
+                                  ? Text(
+                                      _bootstrapError!,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.red.shade100,
+                                        fontSize: 12,
+                                        height: 1.35,
+                                      ),
+                                    )
+                                  : _hasAdmin == null
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Text(
+                                          _hasAdmin!
+                                              ? 'Create a client account. Staff accounts are created by your shop admin — use Sign In with the credentials they give you.'
+                                              : 'First setup: this account becomes the shop owner (admin). You will add cashiers and managers from the app after signing in.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white.withAlpha(235),
+                                            fontSize: 12,
+                                            height: 1.4,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                            ),
+                            const SizedBox(height: 20),
                             // White form card
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),

@@ -58,13 +58,33 @@ Deno.serve(async (req) => {
     const consumerKey = config.mpesa_consumer_key || "";
     const consumerSecret = config.mpesa_consumer_secret || "";
     const passkey = config.mpesa_passkey || "";
-    const baseUrl = (config.mpesa_base_url || "https://api.safaricom.co.ke").replace(/\/$/, "");
+    let baseUrl = (config.mpesa_base_url || "https://api.safaricom.co.ke").replace(/\/$/, "");
+    // Sandbox credentials MUST call sandbox host or Daraja returns e.g. 500.001.1001 "Merchant does not exist"
+    if (config.mpesa_is_sandbox === true) {
+      baseUrl = "https://sandbox.safaricom.co.ke";
+    }
     const callbackUrl = config.mpesa_callback_url || "";
     const transactionType = config.mpesa_transaction_type || "CustomerBuyGoodsOnline";
-    const shortcode = config.mpesa_shortcode || "";
-    const tillNumber = config.mpesa_till_number || "";
+    const shortcodeRaw = String(config.mpesa_shortcode || "").trim();
+    const tillRaw = String(config.mpesa_till_number || "").trim();
 
-    const businessShortCode = tillNumber || shortcode;
+    // Passkey is issued for a specific BusinessShortCode (Paybill / head office).
+    // Buy Goods: BusinessShortCode = Paybill, PartyB = Till.
+    // Pay Bill: PartyB is typically the same as BusinessShortCode (Paybill).
+    let businessShortCode: string;
+    let partyB: string;
+    const isPayBill = transactionType === "CustomerPayBillOnline";
+    if (isPayBill) {
+      businessShortCode = shortcodeRaw || tillRaw;
+      partyB = businessShortCode;
+    } else if (shortcodeRaw && tillRaw) {
+      businessShortCode = shortcodeRaw;
+      partyB = tillRaw;
+    } else {
+      businessShortCode = tillRaw || shortcodeRaw;
+      partyB = businessShortCode;
+    }
+
     if (!consumerKey || !consumerSecret || !passkey || !callbackUrl || !businessShortCode) {
       return new Response(
         JSON.stringify({
@@ -113,7 +133,7 @@ Deno.serve(async (req) => {
       TransactionType: transactionType,
       Amount: amountInt,
       PartyA: Number(partyA),
-      PartyB: Number(businessShortCode),
+      PartyB: Number(partyB),
       PhoneNumber: Number(partyA),
       CallBackURL: callbackUrl,
       AccountReference: (reference || "POS").slice(0, 12),
@@ -132,8 +152,18 @@ Deno.serve(async (req) => {
     const stkData = await stkRes.json();
 
     if (!stkRes.ok) {
+      const nested = stkData?.requestId ? stkData : (stkData?.detail ?? stkData);
+      const msg = nested?.errorMessage ?? nested?.message ?? stkData?.errorMessage ?? JSON.stringify(stkData);
       return new Response(
-        JSON.stringify({ error: "STK Push request failed", detail: stkData }),
+        JSON.stringify({
+          error: "STK Push request failed",
+          detail: stkData,
+          message: msg,
+          hint:
+            String(msg).includes("Merchant does not exist") || String(msg).includes("500.001.1001")
+              ? "Check: (1) Consumer Key/Secret match this environment (sandbox vs production). (2) Shortcode matches the passkey in Daraja. (3) For Buy Goods, set Paybill in Shortcode and Till in Till Number. (4) Turn on Sandbox in Shop Settings if using sandbox keys."
+              : undefined,
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

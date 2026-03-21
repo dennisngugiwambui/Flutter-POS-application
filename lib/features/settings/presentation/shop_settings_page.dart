@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../dashboard_provider.dart';
 import '../domain/shop_settings_model.dart';
 import 'settings_provider.dart';
 
@@ -158,6 +159,12 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final role = ref.watch(profileProvider).maybeWhen(
+          data: (p) => p?.role.toLowerCase() ?? '',
+          orElse: () => '',
+        );
+    final isCashier = role == 'cashier';
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -182,7 +189,7 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: _logoUploading ? null : _pickAndUploadLogo,
+                          onTap: isCashier || _logoUploading ? null : _pickAndUploadLogo,
                           child: Container(
                             width: 80,
                             height: 80,
@@ -208,11 +215,12 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
                             children: [
                               Text('Used on receipts and reports', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
                               const SizedBox(height: 8),
-                              TextButton.icon(
-                                onPressed: _logoUploading ? null : _pickAndUploadLogo,
-                                icon: const Icon(Icons.upload_rounded, size: 18),
-                                label: const Text('Select logo'),
-                              ),
+                              if (!isCashier)
+                                TextButton.icon(
+                                  onPressed: _logoUploading ? null : _pickAndUploadLogo,
+                                  icon: const Icon(Icons.upload_rounded, size: 18),
+                                  label: const Text('Select logo'),
+                                ),
                             ],
                           ),
                         ),
@@ -252,80 +260,89 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
                   );
                 },
               ),
-               _buildTextField('Shop Name', _nameController, Icons.storefront_rounded, colorScheme),
+               _buildTextField('Shop Name', _nameController, Icons.storefront_rounded, colorScheme, readOnly: isCashier),
                const SizedBox(height: 20),
-               _buildTextField('PO BOX', _poBoxController, Icons.mail_outline_rounded, colorScheme),
+               _buildTextField('PO BOX', _poBoxController, Icons.mail_outline_rounded, colorScheme, readOnly: isCashier),
                const SizedBox(height: 20),
-               _buildTextField('Address', _addressController, Icons.location_on_outlined, colorScheme),
+               _buildTextField('Address', _addressController, Icons.location_on_outlined, colorScheme, readOnly: isCashier),
                const SizedBox(height: 20),
-               _buildTextField('Phone Number', _phoneController, Icons.phone_outlined, colorScheme),
+               _buildTextField('Phone Number', _phoneController, Icons.phone_outlined, colorScheme, readOnly: isCashier),
                const SizedBox(height: 20),
                Text('Printer type', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
                const SizedBox(height: 8),
-               Row(
-                 children: [
-                   _printerChip('standard', 'Standard (A4)', Icons.print_rounded, colorScheme),
-                   const SizedBox(width: 12),
-                   _printerChip('thermal', 'Thermal (80mm)', Icons.receipt_long_rounded, colorScheme),
-                 ],
-               ),
-               const SizedBox(height: 24),
-               Text('M-Pesa (Daraja API)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
-               const SizedBox(height: 6),
-               Text('Configure for STK Push. Use Callback URL from Supabase Edge Function.', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
-               const SizedBox(height: 12),
-               _buildTextField('Consumer Key', _mpesaConsumerKeyController, Icons.vpn_key_rounded, colorScheme, optional: true),
-               const SizedBox(height: 12),
-               _buildTextField('Consumer Secret', _mpesaConsumerSecretController, Icons.lock_rounded, colorScheme, optional: true, obscure: true),
-               const SizedBox(height: 12),
-               _buildTextField('Shortcode', _mpesaShortcodeController, Icons.confirmation_number_outlined, colorScheme, optional: true),
-               const SizedBox(height: 12),
-               _buildTextField('Till Number (Buy Goods)', _mpesaTillNumberController, Icons.store_rounded, colorScheme, optional: true),
-               const SizedBox(height: 12),
-               _buildTextField('Passkey', _mpesaPasskeyController, Icons.key_rounded, colorScheme, optional: true, obscure: true),
-               const SizedBox(height: 12),
-               _buildTextField('Base URL', _mpesaBaseUrlController, Icons.link_rounded, colorScheme, optional: true),
-               const SizedBox(height: 12),
-               _buildTextField('Callback URL (STK result)', _mpesaCallbackUrlController, Icons.webhook_rounded, colorScheme, optional: true),
-               const SizedBox(height: 12),
-               Text('Transaction type', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
-               const SizedBox(height: 6),
-               Row(
-                 children: [
-                   _mpesaTypeChip('CustomerBuyGoodsOnline', 'Buy Goods', colorScheme),
-                   const SizedBox(width: 8),
-                   _mpesaTypeChip('CustomerPayBillOnline', 'Pay Bill', colorScheme),
-                 ],
-               ),
-               const SizedBox(height: 12),
-               Row(
-                 children: [
-                   Icon(Icons.science_rounded, size: 20, color: colorScheme.onSurfaceVariant),
-                   const SizedBox(width: 8),
-                   Text('Sandbox', style: TextStyle(fontSize: 14, color: colorScheme.onSurface)),
-                   const Spacer(),
-                   Switch(
-                     value: _mpesaIsSandbox,
-                     onChanged: (v) => setState(() => _mpesaIsSandbox = v),
-                     activeTrackColor: colorScheme.primaryContainer,
-                     activeThumbColor: colorScheme.primary,
+               IgnorePointer(
+                 ignoring: isCashier,
+                 child: Opacity(
+                   opacity: isCashier ? 0.55 : 1,
+                   child: Row(
+                     children: [
+                       _printerChip('standard', 'Standard (A4)', Icons.print_rounded, colorScheme),
+                       const SizedBox(width: 12),
+                       _printerChip('thermal', 'Thermal (80mm)', Icons.receipt_long_rounded, colorScheme),
+                     ],
                    ),
-                 ],
+                 ),
                ),
+               if (!isCashier) ...[
+                 const SizedBox(height: 24),
+                 Text('M-Pesa (Daraja API)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+                 const SizedBox(height: 6),
+                 Text('Configure for STK Push. Use Callback URL from Supabase Edge Function.', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                 const SizedBox(height: 12),
+                 _buildTextField('Consumer Key', _mpesaConsumerKeyController, Icons.vpn_key_rounded, colorScheme, optional: true),
+                 const SizedBox(height: 12),
+                 _buildTextField('Consumer Secret', _mpesaConsumerSecretController, Icons.lock_rounded, colorScheme, optional: true, obscure: true),
+                 const SizedBox(height: 12),
+                 _buildTextField('Shortcode', _mpesaShortcodeController, Icons.confirmation_number_outlined, colorScheme, optional: true),
+                 const SizedBox(height: 12),
+                 _buildTextField('Till Number (Buy Goods)', _mpesaTillNumberController, Icons.store_rounded, colorScheme, optional: true),
+                 const SizedBox(height: 12),
+                 _buildTextField('Passkey', _mpesaPasskeyController, Icons.key_rounded, colorScheme, optional: true, obscure: true),
+                 const SizedBox(height: 12),
+                 _buildTextField('Base URL', _mpesaBaseUrlController, Icons.link_rounded, colorScheme, optional: true),
+                 const SizedBox(height: 12),
+                 _buildTextField('Callback URL (STK result)', _mpesaCallbackUrlController, Icons.webhook_rounded, colorScheme, optional: true),
+                 const SizedBox(height: 12),
+                 Text('Transaction type', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
+                 const SizedBox(height: 6),
+                 Row(
+                   children: [
+                     _mpesaTypeChip('CustomerBuyGoodsOnline', 'Buy Goods', colorScheme),
+                     const SizedBox(width: 8),
+                     _mpesaTypeChip('CustomerPayBillOnline', 'Pay Bill', colorScheme),
+                   ],
+                 ),
+                 const SizedBox(height: 12),
+                 Row(
+                   children: [
+                     Icon(Icons.science_rounded, size: 20, color: colorScheme.onSurfaceVariant),
+                     const SizedBox(width: 8),
+                     Text('Sandbox', style: TextStyle(fontSize: 14, color: colorScheme.onSurface)),
+                     const Spacer(),
+                     Switch(
+                       value: _mpesaIsSandbox,
+                       onChanged: (v) => setState(() => _mpesaIsSandbox = v),
+                       activeTrackColor: colorScheme.primaryContainer,
+                       activeThumbColor: colorScheme.primary,
+                     ),
+                   ],
+                 ),
+               ],
                const SizedBox(height: 48),
-               SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _saveSettings,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+               if (!isCashier)
+                 SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _saveSettings,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: _isLoading 
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('SAVE SETTINGS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
-                  child: _isLoading 
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('SAVE SETTINGS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
-              ),
             ],
           ),
         ),
@@ -401,7 +418,15 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, ColorScheme colorScheme, {bool optional = false, bool obscure = false}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    IconData icon,
+    ColorScheme colorScheme, {
+    bool optional = false,
+    bool obscure = false,
+    bool readOnly = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -410,7 +435,8 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
         TextFormField(
           controller: controller,
           obscureText: obscure,
-          validator: optional ? null : (value) => value == null || value.isEmpty ? 'Required' : null,
+          readOnly: readOnly,
+          validator: optional || readOnly ? null : (value) => value == null || value.isEmpty ? 'Required' : null,
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: colorScheme.primary, size: 20),
             filled: true,

@@ -9,13 +9,11 @@ import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/sale_record_model.dart';
-import '../data/sales_repository.dart';
+import '../data/sales_providers.dart';
 import '../../auth/domain/profile_model.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../../dashboard_provider.dart';
 import '../../../core/money_format.dart';
-
-final salesRepositoryProvider = Provider<SalesRepository>((ref) => SalesRepository());
 
 class SalesHistoryPage extends ConsumerStatefulWidget {
   const SalesHistoryPage({super.key});
@@ -36,11 +34,31 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   @override
   void initState() {
     super.initState();
-    _loadUsers();
-    _loadSales();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final role = ref.read(profileProvider).maybeWhen(
+            data: (p) => p?.role.toLowerCase() ?? '',
+            orElse: () => '',
+          );
+      if (role == 'cashier') {
+        _filterUserId = Supabase.instance.client.auth.currentUser?.id;
+      }
+      _loadUsers();
+      _loadSales();
+    });
   }
 
   Future<void> _loadUsers() async {
+    final role = ref.read(profileProvider).maybeWhen(
+          data: (p) => p?.role.toLowerCase() ?? '',
+          orElse: () => '',
+        );
+    if (role == 'cashier') {
+      setState(() {
+        _users = [];
+        _loadingUsers = false;
+      });
+      return;
+    }
     setState(() => _loadingUsers = true);
     try {
       final res = await Supabase.instance.client.from('profiles').select().order('full_name');

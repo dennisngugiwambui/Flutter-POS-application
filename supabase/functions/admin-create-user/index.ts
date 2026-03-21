@@ -1,5 +1,5 @@
 // Create a new auth user (employee) without switching the admin's session.
-// Caller must be authenticated and have profiles.role = 'admin'.
+// Caller must be authenticated and have profiles.role = 'admin' or 'manager'.
 // Deploy: supabase functions deploy admin-create-user
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -38,8 +38,9 @@ Deno.serve(async (req) => {
       .eq("id", userData.user.id)
       .single();
 
-    if (profErr || !profile || profile.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Forbidden: admin only" }), {
+    const callerRole = profile?.role as string | undefined;
+    if (profErr || !profile || (callerRole !== "admin" && callerRole !== "manager")) {
+      return new Response(JSON.stringify({ error: "Forbidden: admin or manager only" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -50,7 +51,16 @@ Deno.serve(async (req) => {
     const password = body.password as string;
     const fullName = (body.full_name as string)?.trim() ?? "";
     const phoneNumber = (body.phone_number as string)?.trim() ?? "";
-    const role = body.role === "admin" ? "admin" : "cashier";
+    const rawRole = String(body.role ?? "cashier").toLowerCase().trim();
+    let role = ["admin", "manager", "cashier"].includes(rawRole) ? rawRole : "cashier";
+    if (callerRole === "manager") {
+      if (role !== "cashier") {
+        return new Response(JSON.stringify({ error: "Managers may only create cashier accounts" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     if (!email || !password) {
       return new Response(JSON.stringify({ error: "email and password required" }), {
@@ -60,6 +70,28 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: avail, error: availErr } = await adminClient.rpc("check_registration_available", {
+      p_email: email,
+      p_phone: phoneNumber,
+    });
+    if (availErr) {
+      return new Response(JSON.stringify({ error: availErr.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const taken = avail as { email_taken?: boolean; phone_taken?: boolean } | null;
+    if (taken?.email_taken || taken?.phone_taken) {
+      return new Response(
+        JSON.stringify({
+          error: taken?.email_taken
+            ? "This email is already registered"
+            : "This phone number is already registered",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
       email,
       password,

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/theme_context.dart';
+import '../../../core/role_guard.dart';
 import '../../../core/ui_components.dart';
+import '../../../dashboard_provider.dart';
+import '../../dashboard/presentation/main_shell.dart';
 import '../../../core/money_format.dart';
 import '../domain/product_model.dart';
 import 'product_provider.dart';
@@ -29,9 +33,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsProvider);
+    final profileAsync = ref.watch(profileProvider);
+    final role = profileAsync.maybeWhen(data: (p) => p?.role.toLowerCase() ?? '', orElse: () => '');
+    final isClient = role == 'client';
+    final canManageProducts = role == 'admin' || role == 'manager';
+    final canEditProduct = role == 'admin';
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: context.appBg,
       body: CustomScrollView(
         slivers: [
           // ── Header ──────────────────────────────────────────────────────────────
@@ -42,13 +51,18 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                 child: Row(
                   children: [
-                    const Expanded(
+                    TopIconBtn(
+                      icon: Icons.menu_rounded,
+                      onTap: () => MainShell.shellScaffoldKey.currentState?.openDrawer(),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
                       child: Text(
                         'Products',
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w900,
-                          color: kText,
+                          color: context.appText,
                           letterSpacing: -0.6,
                         ),
                       ),
@@ -92,14 +106,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                           _searchController.clear();
                           setState(() => _query = '');
                         },
-                        child: const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Icon(Icons.close_rounded, color: kTextMuted, size: 18),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(Icons.close_rounded, color: context.appTextMuted, size: 18),
                         ),
                       )
-                    : const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Icon(Icons.tune_rounded, color: kTextMuted, size: 18),
+                    : Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(Icons.tune_rounded, color: context.appTextMuted, size: 18),
                       ),
               ),
             ),
@@ -122,10 +136,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                           duration: const Duration(milliseconds: 180),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
-                            color: active ? kPrimary : kSurface,
+                            color: active ? kPrimary : context.appSurface,
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: active ? kPrimary : kBorder,
+                              color: active ? kPrimary : context.appBorder,
                               width: 0.9,
                             ),
                             boxShadow: active
@@ -137,7 +151,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: active ? Colors.white : kTextSub,
+                              color: active ? Colors.white : context.appTextSub,
                             ),
                           ),
                         ),
@@ -173,20 +187,20 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                           width: 72,
                           height: 72,
                           decoration: BoxDecoration(
-                            color: kSurface2,
+                            color: context.appSurface2,
                             borderRadius: BorderRadius.circular(22),
                           ),
-                          child: const Icon(Icons.inventory_2_outlined, size: 32, color: kTextMuted),
+                          child: Icon(Icons.inventory_2_outlined, size: 32, color: context.appTextMuted),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'No products found',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kText),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: context.appText),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
+                        Text(
                           'Try a different search or filter',
-                          style: TextStyle(fontSize: 13, color: kTextSub),
+                          style: TextStyle(fontSize: 13, color: context.appTextSub),
                         ),
                       ],
                     ),
@@ -200,10 +214,15 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   delegate: SliverChildBuilderDelegate(
                     (ctx, i) => _ProductCard(
                       product: filtered[i],
+                      showDelete: canManageProducts,
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ProductDetailPage(product: filtered[i]),
+                          builder: (_) => ProductDetailPage(
+                            product: filtered[i],
+                            clientMode: isClient,
+                            canEdit: canEditProduct,
+                          ),
                         ),
                       ).then((_) => ref.invalidate(productsProvider)),
                       onDelete: () => _confirmDelete(context, ref, filtered[i]),
@@ -240,51 +259,57 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         ],
       ),
 
-      // ── FAB ─────────────────────────────────────────────────────────────────────
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1B8B5A), Color(0xFF26B573)],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: kPrimary.withAlpha(80),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AddProductPage()),
-            ).then((_) => ref.invalidate(productsProvider)),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 22, vertical: 15),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 7),
-                  Text(
-                    'New Product',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                    ),
+      floatingActionButton: canManageProducts
+          ? Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1B8B5A), Color(0xFF26B573)],
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimary.withAlpha(80),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
-            ),
-          ),
-        ),
-      ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RoleGuard(
+                        allowedRoles: ['admin', 'manager'],
+                        child: AddProductPage(),
+                      ),
+                    ),
+                  ).then((_) => ref.invalidate(productsProvider)),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                        SizedBox(width: 7),
+                        Text(
+                          'New Product',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -293,35 +318,35 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     final confirmed = await showModalBottomSheet<bool>(
       context: ctx,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
+      builder: (sheetCtx) {
+        final cs = Theme.of(sheetCtx).colorScheme;
+        return Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 30),
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(28),
-        ),
+        decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(28)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: kError.withAlpha(18),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(Icons.delete_outline_rounded, color: kError, size: 26),
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(color: kError.withAlpha(15), borderRadius: BorderRadius.circular(18)),
+              child: const Icon(Icons.delete_outline_rounded, color: kError, size: 28),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Delete Product?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText),
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: cs.onSurface,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
-              'This will permanently remove "${p.name}".',
+              '"${p.name}" will be permanently removed.\nThis cannot be undone.',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: kTextSub),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant, height: 1.5),
             ),
             const SizedBox(height: 24),
             Row(
@@ -329,26 +354,46 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancel'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      side: BorderSide(color: cs.outline),
+                    ),
+                    child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700, color: cs.onSurface)),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: kError),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Delete'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kError,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ),
               ],
             ),
           ],
         ),
-      ),
+      );
+      },
     );
     if (confirmed == true && ctx.mounted) {
       await ref.read(productRepositoryProvider).deleteProduct(p.id!);
       ref.invalidate(productsProvider);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text('"${p.name}" deleted'),
+            backgroundColor: kError,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
     }
   }
 }
@@ -356,11 +401,13 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
 // ── Product card ───────────────────────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
   final ProductModel product;
+  final bool showDelete;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ProductCard({
     required this.product,
+    required this.showDelete,
     required this.onTap,
     required this.onDelete,
   });
@@ -373,17 +420,17 @@ class _ProductCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: kSurface,
+          color: context.appSurface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isLow ? kError.withAlpha(55) : kBorder,
+            color: isLow ? kError.withAlpha(55) : context.appBorder,
             width: 0.9,
           ),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x0C0A2018),
+              color: Theme.of(context).colorScheme.shadow.withAlpha(20),
               blurRadius: 14,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -402,9 +449,9 @@ class _ProductCard extends StatelessWidget {
                         ? Image.network(
                             product.imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _placeholder(),
+                            errorBuilder: (_, __, ___) => _placeholder(context),
                           )
-                        : _placeholder(),
+                        : _placeholder(context),
                     Positioned(
                       bottom: 0,
                       left: 0,
@@ -457,33 +504,34 @@ class _ProductCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: onDelete,
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(235),
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(18),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.delete_outline_rounded,
-                            color: kError,
-                            size: 16,
+                    if (showDelete)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: onDelete,
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(235),
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withAlpha(18),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: kError,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -501,10 +549,10 @@ class _ProductCard extends StatelessWidget {
                       product.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: kText,
+                        color: context.appText,
                         letterSpacing: -0.2,
                         height: 1.25,
                       ),
@@ -550,11 +598,11 @@ class _ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() {
+  Widget _placeholder(BuildContext context) {
     return Container(
-      color: kSurface2,
-      child: const Center(
-        child: Icon(Icons.inventory_2_outlined, size: 40, color: kTextMuted),
+      color: context.appSurface2,
+      child: Center(
+        child: Icon(Icons.inventory_2_outlined, size: 40, color: context.appTextMuted),
       ),
     );
   }

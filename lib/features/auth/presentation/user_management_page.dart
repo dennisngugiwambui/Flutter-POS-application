@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/ui_components.dart';
+import '../../../dashboard_provider.dart';
 import '../domain/profile_model.dart';
 import 'create_employee_sheet.dart';
 
@@ -13,14 +14,24 @@ class UserManagementPage extends ConsumerStatefulWidget {
   ConsumerState<UserManagementPage> createState() => _UserManagementPageState();
 }
 
-class _UserManagementPageState extends ConsumerState<UserManagementPage> {
+class _UserManagementPageState extends ConsumerState<UserManagementPage>
+    with SingleTickerProviderStateMixin {
   List<ProfileModel> _users = [];
   bool _loading = true;
+  late TabController _tabs;
+  static const _tabsList = ['All', 'Admin', 'Manager', 'Cashier'];
 
   @override
   void initState() {
     super.initState();
+    _tabs = TabController(length: _tabsList.length, vsync: this);
     _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsers() async {
@@ -36,9 +47,27 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
     }
   }
 
+  List<ProfileModel> _filtered(String tab) {
+    if (tab == 'All') return _users;
+    final r = tab.toLowerCase();
+    return _users.where((u) => u.role.toLowerCase() == r).toList();
+  }
+
   Future<void> _toggleActive(ProfileModel user) async {
     if (user.id == null) return;
-    final newVal = user.isActive == true ? false : true;
+    final newVal = user.isActive != true;
+    final ok = await _showConfirmModal(
+      context: context,
+      icon: newVal ? Icons.check_circle_rounded : Icons.block_rounded,
+      iconColor: newVal ? kPrimary : kError,
+      title: newVal ? 'Activate User?' : 'Deactivate User?',
+      message: newVal
+          ? '${user.fullName} will be able to access the system.'
+          : '${user.fullName} will lose access immediately.',
+      confirmLabel: newVal ? 'Activate' : 'Deactivate',
+      confirmColor: newVal ? kPrimary : kError,
+    );
+    if (ok != true) return;
     await Supabase.instance.client.from('profiles').update({'is_active': newVal}).eq('id', user.id!);
     _loadUsers();
   }
@@ -49,196 +78,357 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
     _loadUsers();
   }
 
+  Future<bool?> _showConfirmModal({
+    required BuildContext context,
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String message,
+    required String confirmLabel,
+    required Color confirmColor,
+  }) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 30),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(28)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(color: iconColor.withAlpha(18), borderRadius: BorderRadius.circular(16)),
+              child: Icon(icon, color: iconColor, size: 26),
+            ),
+            const SizedBox(height: 16),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: kTextSub)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text(confirmLabel),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBg,
-      body: CustomScrollView(
-        slivers: [
-          // ── App bar ────────────────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: Row(
-                  children: [
-                    TopIconBtn(
-                      icon: Icons.arrow_back_rounded,
-                      onTap: () => Navigator.pop(context),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Text(
-                        'User Management',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: kText,
-                          letterSpacing: -0.5,
+    final isCashier = ref.watch(profileProvider).maybeWhen(
+          data: (p) => p?.role.toLowerCase() == 'cashier',
+          orElse: () => false,
+        );
+    final isStaff = ref.watch(profileProvider).maybeWhen(
+          data: (p) {
+            final r = p?.role.toLowerCase() ?? '';
+            return r == 'admin' || r == 'manager';
+          },
+          orElse: () => false,
+        );
+
+    if (isCashier) {
+      final peers = _users
+          .where((u) => u.role.toLowerCase() == 'cashier' && u.isActive != false)
+          .toList();
+      return Scaffold(
+        backgroundColor: kBg,
+        body: _loading
+            ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary))
+            : CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                TopIconBtn(icon: Icons.arrow_back_rounded, onTap: () => Navigator.pop(context)),
+                                const SizedBox(width: 14),
+                                const Expanded(
+                                  child: Text(
+                                    'Active cashiers',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w900,
+                                      color: kText,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                ),
+                                TopIconBtn(icon: Icons.refresh_rounded, onTap: _loadUsers),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'You can see fellow cashiers who are active. Status changes are managed by a manager or admin.',
+                              style: TextStyle(fontSize: 13, color: kTextSub, height: 1.35),
+                            ),
+                            const SizedBox(height: 14),
+                            AppCard(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.groups_rounded, color: kPrimary, size: 22),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    '${peers.length} active',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: kText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    TopIconBtn(
-                      icon: Icons.refresh_rounded,
-                      onTap: _loadUsers,
+                  ),
+                  if (peers.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text(
+                          'No active cashiers listed',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextSub),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (ctx, i) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _CashierPeerCard(user: peers[i]),
+                          ),
+                          childCount: peers.length,
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                ],
               ),
-            ),
-          ),
+      );
+    }
 
-          // ── Summary strip ──────────────────────────────────────────────────────
+    return Scaffold(
+      backgroundColor: kBg,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, _) => [
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-              child: AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    _summaryCol('Total', '${_users.length}', kPrimary),
-                    _vertDiv(),
-                    _summaryCol('Admins', '${_users.where((u) => u.role == 'admin').length}', kWarning),
-                    _vertDiv(),
-                    _summaryCol('Active', '${_users.where((u) => u.isActive != false).length}', kAccent),
-                  ],
-                ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: Row(
+                      children: [
+                        TopIconBtn(icon: Icons.arrow_back_rounded, onTap: () => Navigator.pop(context)),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Text(
+                            'User Management',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: kText,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                        TopIconBtn(icon: Icons.refresh_rounded, onTap: _loadUsers),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: AppCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Row(
+                        children: [
+                          _summaryCol('Total', '${_users.length}', kPrimary),
+                          _vertDiv(),
+                          _summaryCol('Admins', '${_users.where((u) => u.role.toLowerCase() == 'admin').length}', kWarning),
+                          _vertDiv(),
+                          _summaryCol(
+                            'Managers',
+                            '${_users.where((u) => u.role.toLowerCase() == 'manager').length}',
+                            kAccent,
+                          ),
+                          _vertDiv(),
+                          _summaryCol(
+                            'Cashiers',
+                            '${_users.where((u) => u.role.toLowerCase() == 'cashier').length}',
+                            kInfo,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: kSurface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: kBorder, width: 0.9),
+                      ),
+                      child: TabBar(
+                        controller: _tabs,
+                        labelColor: Colors.white,
+                        unselectedLabelColor: kTextSub,
+                        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                        unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        indicator: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF1B8B5A), Color(0xFF26B573)]),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        dividerColor: Colors.transparent,
+                        padding: const EdgeInsets.all(4),
+                        tabs: _tabsList.map((t) => Tab(text: t, height: 36)).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
               ),
             ),
           ),
-
-          // ── User list ──────────────────────────────────────────────────────────
-          if (_loading)
-            const SliverFillRemaining(
-              child: Center(
+        ],
+        body: _loading
+            ? const Center(
                 child: SizedBox(
                   width: 26,
                   height: 26,
                   child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
                 ),
-              ),
-            )
-          else if (_users.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        color: kSurface2,
-                        borderRadius: BorderRadius.circular(22),
+              )
+            : TabBarView(
+                controller: _tabs,
+                children: _tabsList.map((tab) {
+                  final list = _filtered(tab);
+                  if (list.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(color: kSurface2, borderRadius: BorderRadius.circular(20)),
+                            child: const Icon(Icons.group_outlined, size: 28, color: kTextMuted),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            tab == 'All' ? 'No users yet' : 'No ${tab}s yet',
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextSub),
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.group_outlined, size: 30, color: kTextMuted),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                    itemCount: list.length,
+                    itemBuilder: (_, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _UserCard(
+                        user: list[i],
+                        onToggle: () => _toggleActive(list[i]),
+                        onRoleChanged: (r) => _changeRole(list[i], r),
+                      ),
                     ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'No users found',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kText),
-                    ),
-                  ],
-                ),
+                  );
+                }).toList(),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _UserCard(
-                      user: _users[i],
-                      onToggleActive: () => _toggleActive(_users[i]),
-                      onRoleChanged: (r) => _changeRole(_users[i], r),
+      ),
+      floatingActionButton: isStaff
+          ? Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF1B8B5A), Color(0xFF26B573)]),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [BoxShadow(color: kPrimary.withAlpha(80), blurRadius: 16, offset: const Offset(0, 6))],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => _showAddEmployee(context),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_add_rounded, color: Colors.white, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Add Employee',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  childCount: _users.length,
                 ),
               ),
+            )
+          : null,
+    );
+  }
+
+  Widget _summaryCol(String label, String value, Color color) => Expanded(
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color, letterSpacing: -0.5),
             ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
-      ),
-
-      // ── FAB ─────────────────────────────────────────────────────────────────────
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1B8B5A), Color(0xFF26B573)],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: kPrimary.withAlpha(80),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w600),
             ),
           ],
         ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(18),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () => _showAddEmployee(context),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.person_add_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Add Employee',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _summaryCol(String label, String value, Color color) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: color,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _vertDiv() => Container(
-        width: 0.9,
-        height: 36,
-        color: kBorder,
       );
+
+  Widget _vertDiv() => Container(width: 0.9, height: 32, color: kBorder);
 
   Future<void> _showAddEmployee(BuildContext context) async {
     final created = await showModalBottomSheet<bool>(
@@ -261,23 +451,14 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage> {
   }
 }
 
-// ── User card ──────────────────────────────────────────────────────────────────
-class _UserCard extends StatelessWidget {
+// ── Read-only peer card (cashier view) ─────────────────────────────────────────
+class _CashierPeerCard extends StatelessWidget {
   final ProfileModel user;
-  final VoidCallback onToggleActive;
-  final ValueChanged<String> onRoleChanged;
 
-  const _UserCard({
-    required this.user,
-    required this.onToggleActive,
-    required this.onRoleChanged,
-  });
+  const _CashierPeerCard({required this.user});
 
   @override
   Widget build(BuildContext context) {
-    final isActive = user.isActive != false;
-    final isAdmin = user.role == 'admin';
-
     final parts = user.fullName.split(' ').where((w) => w.isNotEmpty).toList();
     final initials = parts.length >= 2
         ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
@@ -290,11 +471,96 @@ class _UserCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
-              color: isAdmin ? kWarning.withAlpha(22) : kPrimary.withAlpha(18),
-              borderRadius: BorderRadius.circular(15),
+              shape: BoxShape.circle,
+              border: Border.all(color: kPrimary, width: 2),
+              color: kPrimary.withAlpha(18),
+            ),
+            child: Center(
+              child: Text(
+                initials,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: kPrimary),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.fullName,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  user.email,
+                  style: const TextStyle(fontSize: 11, color: kTextSub),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const PillBadge(text: 'ACTIVE', color: kPrimary),
+        ],
+      ),
+    );
+  }
+}
+
+// ── User card ──────────────────────────────────────────────────────────────────
+class _UserCard extends StatelessWidget {
+  final ProfileModel user;
+  final VoidCallback onToggle;
+  final ValueChanged<String> onRoleChanged;
+
+  const _UserCard({required this.user, required this.onToggle, required this.onRoleChanged});
+
+  Color get _roleColor {
+    switch (user.role.toLowerCase()) {
+      case 'admin':
+        return kWarning;
+      case 'manager':
+        return kAccent;
+      default:
+        return kPrimary;
+    }
+  }
+
+  IconData get _roleIcon {
+    switch (user.role.toLowerCase()) {
+      case 'admin':
+        return Icons.admin_panel_settings_rounded;
+      case 'manager':
+        return Icons.manage_accounts_rounded;
+      default:
+        return Icons.point_of_sale_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = user.isActive != false;
+    final parts = user.fullName.split(' ').where((w) => w.isNotEmpty).toList();
+    final initials = parts.length >= 2
+        ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
+        : user.fullName.isNotEmpty
+            ? user.fullName[0].toUpperCase()
+            : '?';
+
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: _roleColor, width: 2),
+              color: _roleColor.withAlpha(18),
             ),
             child: Center(
               child: Text(
@@ -302,14 +568,12 @@ class _UserCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
-                  color: isAdmin ? kWarning : kPrimary,
-                  letterSpacing: -0.3,
+                  color: _roleColor,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 14),
-
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +581,7 @@ class _UserCard extends StatelessWidget {
                 Text(
                   user.fullName,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: kText,
                     letterSpacing: -0.2,
@@ -326,7 +590,7 @@ class _UserCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   user.email,
-                  style: const TextStyle(fontSize: 12, color: kTextSub),
+                  style: const TextStyle(fontSize: 11, color: kTextSub),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
@@ -335,38 +599,33 @@ class _UserCard extends StatelessWidget {
                     GestureDetector(
                       onTap: () => _showRoleSheet(context),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAdmin ? kWarning.withAlpha(18) : kPrimary.withAlpha(15),
+                          color: _roleColor.withAlpha(15),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isAdmin ? kWarning.withAlpha(55) : kPrimary.withAlpha(45),
-                            width: 0.9,
-                          ),
+                          border: Border.all(color: _roleColor.withAlpha(55), width: 0.9),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            Icon(_roleIcon, size: 11, color: _roleColor),
+                            const SizedBox(width: 4),
                             Text(
                               user.role.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w800,
-                                color: isAdmin ? kWarning : kPrimary,
+                                color: _roleColor,
                                 letterSpacing: 0.3,
                               ),
                             ),
                             const SizedBox(width: 3),
-                            Icon(
-                              Icons.expand_more_rounded,
-                              size: 13,
-                              color: isAdmin ? kWarning : kPrimary,
-                            ),
+                            Icon(Icons.expand_more_rounded, size: 12, color: _roleColor),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     PillBadge(
                       text: isActive ? 'ACTIVE' : 'INACTIVE',
                       color: isActive ? kPrimary : kError,
@@ -376,10 +635,9 @@ class _UserCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-
+          const SizedBox(width: 10),
           GestureDetector(
-            onTap: onToggleActive,
+            onTap: onToggle,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 46,
@@ -404,13 +662,7 @@ class _UserCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(25),
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
+                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(25), blurRadius: 3)],
                   ),
                 ),
               ),
@@ -428,10 +680,7 @@ class _UserCard extends StatelessWidget {
       builder: (_) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 30),
         padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(28),
-        ),
+        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(28)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,54 +690,57 @@ class _UserCard extends StatelessWidget {
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: kText),
             ),
             const SizedBox(height: 16),
-            for (final role in ['admin', 'manager', 'cashier'])
+            for (final entry in [
+              ('admin', Icons.admin_panel_settings_rounded, kWarning, 'Full system access'),
+              ('manager', Icons.manage_accounts_rounded, kAccent, 'Manage staff & reports'),
+              ('cashier', Icons.point_of_sale_rounded, kPrimary, 'Process sales only'),
+            ])
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
-                    onRoleChanged(role);
+                    onRoleChanged(entry.$1);
                   },
                   child: Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: user.role == role ? kPrimary.withAlpha(15) : kSurface2,
-                      borderRadius: BorderRadius.circular(15),
+                      color: user.role == entry.$1 ? entry.$3.withAlpha(12) : kSurface2,
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: user.role == role ? kPrimary.withAlpha(55) : kBorder,
+                        color: user.role == entry.$1 ? entry.$3.withAlpha(55) : kBorder,
                         width: 0.9,
                       ),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 36,
-                          height: 36,
+                          width: 38,
+                          height: 38,
                           decoration: BoxDecoration(
-                            color: user.role == role ? kPrimary.withAlpha(18) : kSurface,
-                            borderRadius: BorderRadius.circular(11),
+                            color: user.role == entry.$1 ? entry.$3.withAlpha(20) : kSurface,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(
-                            role == 'admin'
-                                ? Icons.admin_panel_settings_rounded
-                                : role == 'manager'
-                                    ? Icons.manage_accounts_rounded
-                                    : Icons.point_of_sale_rounded,
-                            color: user.role == role ? kPrimary : kTextSub,
-                            size: 20,
-                          ),
+                          child: Icon(entry.$2, color: user.role == entry.$1 ? entry.$3 : kTextSub, size: 20),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          role[0].toUpperCase() + role.substring(1),
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: user.role == role ? kPrimary : kText,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                entry.$1[0].toUpperCase() + entry.$1.substring(1),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: user.role == entry.$1 ? entry.$3 : kText,
+                                ),
+                              ),
+                              Text(entry.$4, style: const TextStyle(fontSize: 11, color: kTextSub)),
+                            ],
                           ),
                         ),
-                        const Spacer(),
-                        if (user.role == role) const Icon(Icons.check_circle_rounded, color: kPrimary, size: 20),
+                        if (user.role == entry.$1) Icon(Icons.check_circle_rounded, color: entry.$3, size: 20),
                       ],
                     ),
                   ),

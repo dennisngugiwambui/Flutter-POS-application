@@ -42,10 +42,10 @@ class MpesaRepository {
       );
 
       if (res.status != 200) {
-        final err = res.data is Map ? (res.data['error'] ?? res.data['detail'] ?? res.data) : res.data;
+        final m = _formatStkErrorResponse(res.data);
         return MpesaStkResult(
           success: false,
-          message: err?.toString() ?? 'STK push request failed',
+          message: m,
         );
       }
 
@@ -73,7 +73,12 @@ class MpesaRepository {
           resultCode: -404,
         );
       }
-      return MpesaStkResult(success: false, message: 'M-Pesa error: ${e.toString()}', resultCode: e.status);
+      final parsed = _formatStkErrorResponse(e.details);
+      return MpesaStkResult(
+        success: false,
+        message: parsed.isNotEmpty ? parsed : 'M-Pesa error: ${e.toString()}',
+        resultCode: e.status,
+      );
     } catch (e) {
       return MpesaStkResult(success: false, message: 'M-Pesa error: $e');
     }
@@ -137,4 +142,28 @@ class MpesaRepository {
     } catch (_) {}
     return null;
   }
+}
+
+/// Parses Edge Function JSON body (e.g. Safaricom 500.001.1001) into a short user message.
+String _formatStkErrorResponse(dynamic data) {
+  if (data == null) return '';
+  if (data is! Map) return data.toString();
+  final hint = data['hint']?.toString();
+  final msg = data['message']?.toString();
+  final err = data['error']?.toString();
+  final detail = data['detail'];
+  String? saf;
+  if (detail is Map) {
+    saf = detail['errorMessage']?.toString() ?? detail['message']?.toString();
+    if (saf == null && detail['error'] is Map) {
+      final inner = detail['error'] as Map;
+      saf = inner['errorMessage']?.toString();
+    }
+  }
+  final parts = <String>[];
+  if (msg != null && msg.isNotEmpty) parts.add(msg);
+  if (saf != null && saf.isNotEmpty && saf != msg) parts.add(saf);
+  if (err != null && err.isNotEmpty && err != 'STK Push request failed') parts.add(err);
+  if (hint != null && hint.isNotEmpty) parts.add(hint);
+  return parts.isEmpty ? data.toString() : parts.join(' ');
 }

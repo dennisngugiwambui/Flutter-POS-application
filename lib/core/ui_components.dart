@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
+import 'theme_context.dart';
 
 // ─── Card with shadow ──────────────────────────────────────────────────────────
 class AppCard extends StatelessWidget {
@@ -20,17 +21,18 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final card = Container(
       padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color ?? kSurface,
+        color: color ?? context.appSurface,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: kBorder, width: 0.9),
-        boxShadow: const [
+        border: Border.all(color: context.appBorder, width: 0.9),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0C0A2018),
+            color: cs.shadow.withAlpha(20),
             blurRadius: 16,
-            offset: Offset(0, 5),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -123,9 +125,9 @@ class StatCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
-              color: kTextSub,
+              color: context.appTextSub,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -156,17 +158,18 @@ class AppSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        color: kSurface,
+        color: context.appSurface,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: kBorder, width: 0.9),
-        boxShadow: const [
+        border: Border.all(color: context.appBorder, width: 0.9),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x080A2018),
+            color: cs.shadow.withAlpha(14),
             blurRadius: 10,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -175,21 +178,21 @@ class AppSearchBar extends StatelessWidget {
         readOnly: readOnly,
         onTap: onTap,
         onChanged: onChanged,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: kText,
+          color: context.appText,
         ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(
-            color: kTextMuted,
+          hintStyle: TextStyle(
+            color: context.appTextMuted,
             fontWeight: FontWeight.w500,
             fontSize: 14,
           ),
-          prefixIcon: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14),
-            child: Icon(Icons.search_rounded, color: kPrimary, size: 20),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Icon(Icons.search_rounded, color: cs.primary, size: 20),
           ),
           prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           suffixIcon: suffix,
@@ -214,14 +217,15 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
-            color: kText,
+            color: context.appText,
             letterSpacing: -0.3,
           ),
         ),
@@ -231,10 +235,10 @@ class SectionHeader extends StatelessWidget {
             onTap: onAction,
             child: Text(
               action!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: kPrimary,
+                color: cs.primary,
               ),
             ),
           ),
@@ -260,24 +264,25 @@ class TopIconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: bg ?? kSurface,
+          color: bg ?? context.appSurface,
           borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: kBorder, width: 0.9),
-          boxShadow: const [
+          border: Border.all(color: context.appBorder, width: 0.9),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x080A2018),
+              color: cs.shadow.withAlpha(14),
               blurRadius: 8,
-              offset: Offset(0, 2),
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Icon(icon, color: iconColor ?? kText, size: 20),
+        child: Icon(icon, color: iconColor ?? context.appText, size: 20),
       ),
     );
   }
@@ -337,8 +342,9 @@ class MenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ic = isDestructive ? kError : (iconColor ?? kPrimary);
-    final ibg = isDestructive ? kError.withAlpha(18) : (iconBg ?? kPrimary.withAlpha(15));
+    final primary = Theme.of(context).colorScheme.primary;
+    final ic = isDestructive ? kError : (iconColor ?? primary);
+    final ibg = isDestructive ? kError.withAlpha(18) : (iconBg ?? primary.withAlpha(15));
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -364,13 +370,13 @@ class MenuRow extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: isDestructive ? kError : kText,
+                        color: isDestructive ? kError : context.appText,
                         letterSpacing: -0.2,
                       ),
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 1),
-                      Text(subtitle!, style: const TextStyle(fontSize: 12, color: kTextSub)),
+                      Text(subtitle!, style: TextStyle(fontSize: 12, color: context.appTextSub)),
                     ],
                   ],
                 ),
@@ -378,7 +384,7 @@ class MenuRow extends StatelessWidget {
               trailing ??
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: isDestructive ? kError.withAlpha(140) : kTextMuted,
+                    color: isDestructive ? kError.withAlpha(140) : context.appTextMuted,
                     size: 20,
                   ),
             ],

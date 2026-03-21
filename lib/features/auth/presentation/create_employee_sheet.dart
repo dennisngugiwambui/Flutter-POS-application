@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../dashboard_provider.dart';
+import 'auth_provider.dart';
 
-class CreateEmployeeSheet extends StatefulWidget {
+class CreateEmployeeSheet extends ConsumerStatefulWidget {
   const CreateEmployeeSheet({super.key});
 
   @override
-  State<CreateEmployeeSheet> createState() => _CreateEmployeeSheetState();
+  ConsumerState<CreateEmployeeSheet> createState() => _CreateEmployeeSheetState();
 }
 
-class _CreateEmployeeSheetState extends State<CreateEmployeeSheet> {
+class _CreateEmployeeSheetState extends ConsumerState<CreateEmployeeSheet> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _password = TextEditingController();
   bool _loading = false;
+  /// Target role in `profiles` / auth metadata: cashier | manager | admin
+  String _role = 'cashier';
 
   @override
   void dispose() {
@@ -43,6 +48,19 @@ class _CreateEmployeeSheetState extends State<CreateEmployeeSheet> {
     }
     setState(() => _loading = true);
     try {
+      final avail = await ref.read(authRepositoryProvider).registrationAvailability(
+            email: _email.text.trim(),
+            phone: _phone.text.trim(),
+          );
+      if (avail.emailTaken) {
+        _showMessage('This email is already registered.', error: true);
+        return;
+      }
+      if (avail.phoneTaken) {
+        _showMessage('This phone number is already used by another account.', error: true);
+        return;
+      }
+
       final res = await Supabase.instance.client.functions.invoke(
         'admin-create-user',
         body: {
@@ -50,7 +68,7 @@ class _CreateEmployeeSheetState extends State<CreateEmployeeSheet> {
           'password': _password.text,
           'full_name': _name.text.trim(),
           'phone_number': _phone.text.trim(),
-          'role': 'cashier',
+          'role': _role,
         },
       );
 
@@ -168,6 +186,49 @@ class _CreateEmployeeSheetState extends State<CreateEmployeeSheet> {
                         final t = (v ?? '');
                         if (t.length < 6) return 'Min 6 characters';
                         return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Role',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Builder(
+                      builder: (context) {
+                        final isManagerOnly = ref.watch(profileProvider).maybeWhen(
+                              data: (p) => p?.role.toLowerCase() == 'manager',
+                              orElse: () => false,
+                            );
+                        final roleOptions = isManagerOnly ? ['cashier'] : ['cashier', 'manager', 'admin'];
+                        if (!roleOptions.contains(_role)) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) setState(() => _role = 'cashier');
+                          });
+                        }
+                        return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final r in roleOptions)
+                          ChoiceChip(
+                            label: Text(r[0].toUpperCase() + r.substring(1)),
+                            selected: _role == r,
+                            onSelected: _loading
+                                ? null
+                                : (sel) {
+                                    if (sel) setState(() => _role = r);
+                                  },
+                          ),
+                      ],
+                    );
                       },
                     ),
                     const SizedBox(height: 16),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shop/components/product/product_card.dart';
+import '../../../core/role_guard.dart';
 import 'product_provider.dart';
 import '../domain/product_model.dart';
 import 'product_detail_page.dart';
@@ -91,7 +92,14 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
           borderRadius: BorderRadius.circular(28),
           child: InkWell(
             onTap: () async {
-              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddProductPage()));
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const RoleGuard(
+                    allowedRoles: ['admin', 'manager'],
+                    child: AddProductPage(),
+                  ),
+                ),
+              );
               ref.invalidate(productsProvider);
             },
             borderRadius: BorderRadius.circular(28),
@@ -139,9 +147,18 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
               title: product.name,
               price: product.sellingPrice,
               press: () async {
+                final role = ref.read(profileProvider).maybeWhen(
+                      data: (p) => p?.role.toLowerCase() ?? '',
+                      orElse: () => '',
+                    );
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => ProductDetailPage(product: product)),
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailPage(
+                      product: product,
+                      canEdit: role == 'admin',
+                    ),
+                  ),
                 );
                 if (!context.mounted) return;
                 ref.invalidate(productsProvider);
