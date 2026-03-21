@@ -1,235 +1,503 @@
 import 'package:flutter/material.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/ui_components.dart';
 import '../../../core/money_format.dart';
 import '../domain/product_model.dart';
 import 'edit_product_page.dart';
-import 'package:shop/screens/product/views/components/product_info.dart';
 
 class ProductDetailPage extends StatelessWidget {
   final ProductModel product;
-
   const ProductDetailPage({super.key, required this.product});
 
   @override
   Widget build(BuildContext context) {
-    final isLowStock = product.stockQuantity <= 5;
-    final isAvailable = product.stockQuantity > 0;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isLow = product.stockQuantity <= 5;
+    final profit = product.sellingPrice - product.buyingPrice;
+    final margin = product.buyingPrice > 0 ? (profit / product.buyingPrice * 100) : 0.0;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: kBg,
       body: CustomScrollView(
         slivers: [
+          // ── Full-width image hero ────────────────────────────────────────────
           SliverAppBar(
-            expandedHeight: 220,
+            expandedHeight: 300,
             pinned: true,
-            backgroundColor: colorScheme.surface,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.arrow_back_rounded, color: colorScheme.onSurface, size: 20),
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => EditProductPage(product: product)),
-                ).then((_) => Navigator.pop(context, true)),
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
+            backgroundColor: kSurface,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: Padding(
+              padding: const EdgeInsets.all(8),
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withAlpha(180),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.edit_rounded, size: 20, color: colorScheme.onPrimaryContainer),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      colorScheme.primary.withAlpha(30),
-                      colorScheme.surface,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x200A2018),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
                     ],
                   ),
-                ),
-                child: Center(
-                  child: Hero(
-                    tag: 'product-${product.id}',
-                    child: Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withAlpha(60),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: product.imageUrl.isNotEmpty
-                            ? Image.network(
-                                product.imageUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_rounded, color: colorScheme.primary, size: 56),
-                              )
-                            : Icon(Icons.inventory_2_rounded, color: colorScheme.primary.withAlpha(200), size: 56),
-                      ),
-                    ),
-                  ),
+                  child: const Icon(Icons.arrow_back_rounded, color: kText, size: 20),
                 ),
               ),
             ),
-          ),
-          ProductInfo(
-            brand: 'POS',
-            title: product.name,
-            description:
-                'Barcode: ${product.barcode}\nBuying: ${formatKes(product.buyingPrice)}\nSelling: ${formatKes(product.sellingPrice)}',
-            rating: 4.6,
-            numOfReviews: 0,
-            isAvailable: isAvailable,
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => EditProductPage(product: product)),
+                  ).then((_) {
+                    if (context.mounted) Navigator.pop(context, true);
+                  }),
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: kPrimary,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kPrimary.withAlpha(70),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
                 children: [
-                  if (isLowStock)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  product.imageUrl.isNotEmpty
+                      ? Image.network(
+                          product.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _imageFallback(),
+                        )
+                      : _imageFallback(),
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 100,
                       decoration: BoxDecoration(
-                        color: colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.warning_amber_rounded, size: 18, color: colorScheme.onErrorContainer),
-                          const SizedBox(width: 6),
-                          Text('Low stock', style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.onErrorContainer, fontSize: 13)),
-                        ],
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            kBg.withAlpha(230),
+                          ],
+                        ),
                       ),
                     ),
-                  const SizedBox(height: 24),
-                  _DetailCard(
-                    colorScheme: colorScheme,
-                    children: [
-                      _DetailRow(label: 'Barcode', value: product.barcode, icon: Icons.qr_code_2_rounded),
-                      _DetailRow(label: 'Buying price', value: formatKes(product.buyingPrice), icon: Icons.shopping_bag_outlined),
-                      _DetailRow(label: 'Selling price', value: formatKes(product.sellingPrice), icon: Icons.sell_rounded),
-                      _DetailRow(
-                        label: 'Stock',
-                        value: '${product.stockQuantity}',
-                        icon: Icons.inventory_2_outlined,
-                        trailing: isLowStock ? null : Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: colorScheme.tertiaryContainer.withAlpha(120),
-                            borderRadius: BorderRadius.circular(10),
+                  ),
+                  Positioned(
+                    bottom: 16,
+                    left: 20,
+                    child: isLow
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: kError,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: kError.withAlpha(70),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 14),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Low Stock',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: kPrimary,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: kPrimary.withAlpha(70),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: Colors.white, size: 14),
+                                SizedBox(width: 5),
+                                Text(
+                                  'In Stock',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          child: Text('In stock', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onTertiaryContainer)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Content ──────────────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: kText,
+                      letterSpacing: -0.6,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kSurface2,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: kBorder, width: 0.9),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.qr_code_rounded, color: kTextSub, size: 13),
+                            const SizedBox(width: 5),
+                            Text(
+                              product.barcode.isEmpty ? 'No barcode' : product.barcode,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: kTextSub,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 22),
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [kPrimary.withAlpha(18), kPrimary.withAlpha(6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: kPrimary.withAlpha(45), width: 0.9),
+                    ),
+                    child: Row(
+                      children: [
+                        _priceCol(
+                          label: 'Selling Price',
+                          value: formatKes(product.sellingPrice),
+                          color: kPrimary,
+                          large: true,
+                        ),
+                        Container(
+                          width: 0.9,
+                          height: 44,
+                          color: kPrimary.withAlpha(30),
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        _priceCol(
+                          label: 'Buying Price',
+                          value: formatKes(product.buyingPrice),
+                          color: kTextSub,
+                          large: false,
+                        ),
+                        Container(
+                          width: 0.9,
+                          height: 44,
+                          color: kPrimary.withAlpha(30),
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        _priceCol(
+                          label: 'Profit',
+                          value: formatKes(profit),
+                          color: profit >= 0 ? kPrimary : kError,
+                          large: false,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: margin >= 20 ? kPrimary.withAlpha(15) : kWarning.withAlpha(15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: margin >= 20 ? kPrimary.withAlpha(45) : kWarning.withAlpha(45),
+                            width: 0.9,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.show_chart_rounded,
+                              size: 14,
+                              color: margin >= 20 ? kPrimary : kWarning,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Margin: ${margin.toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: margin >= 20 ? kPrimary : kWarning,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  const Text(
+                    'Product Details',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: kText,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AppCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        _DetailRow(
+                          icon: Icons.qr_code_2_rounded,
+                          label: 'Barcode',
+                          value: product.barcode.isEmpty ? '—' : product.barcode,
+                          iconColor: kPrimary,
+                        ),
+                        Divider(height: 1, color: kBorder.withAlpha(160), indent: 54),
+                        _DetailRow(
+                          icon: Icons.shopping_bag_outlined,
+                          label: 'Buying Price',
+                          value: formatKes(product.buyingPrice),
+                          iconColor: kTextSub,
+                        ),
+                        Divider(height: 1, color: kBorder.withAlpha(160), indent: 54),
+                        _DetailRow(
+                          icon: Icons.sell_rounded,
+                          label: 'Selling Price',
+                          value: formatKes(product.sellingPrice),
+                          iconColor: kPrimary,
+                          valueColor: kPrimary,
+                        ),
+                        Divider(height: 1, color: kBorder.withAlpha(160), indent: 54),
+                        _DetailRow(
+                          icon: Icons.inventory_2_rounded,
+                          label: 'Stock Quantity',
+                          value: '${product.stockQuantity} units',
+                          iconColor: isLow ? kError : kPrimary,
+                          valueColor: isLow ? kError : null,
+                          trailing: isLow
+                              ? null
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: kPrimary.withAlpha(15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'In stock',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: kPrimary,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => EditProductPage(product: product)),
+                      ).then((_) {
+                        if (context.mounted) Navigator.pop(context, true);
+                      }),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                      label: const Text(
+                        'Edit Product',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 60)),
+        ],
+      ),
+    );
+  }
+
+  Widget _priceCol({
+    required String label,
+    required String value,
+    required Color color,
+    required bool large,
+  }) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: large ? 16 : 13,
+              fontWeight: FontWeight.w900,
+              color: color,
+              letterSpacing: -0.4,
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _DetailCard extends StatelessWidget {
-  final ColorScheme colorScheme;
-  final List<Widget> children;
-
-  const _DetailCard({required this.colorScheme, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
+  static Widget _imageFallback() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withAlpha(100),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outline.withAlpha(40)),
-      ),
-      child: Column(
-        children: [
-          for (int i = 0; i < children.length; i++) ...[
-            children[i],
-            if (i < children.length - 1) Divider(height: 1, color: colorScheme.outline.withAlpha(50), indent: 60),
-          ],
-        ],
+      color: kSurface2,
+      child: const Center(
+        child: Icon(Icons.inventory_2_outlined, size: 64, color: kTextMuted),
       ),
     );
   }
 }
 
+// ── Detail row ─────────────────────────────────────────────────────────────────
 class _DetailRow extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
-  final IconData icon;
+  final Color? iconColor;
+  final Color? valueColor;
   final Widget? trailing;
 
-  const _DetailRow({required this.label, required this.value, required this.icon, this.trailing});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.iconColor,
+    this.valueColor,
+    this.trailing,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 13),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primary.withAlpha(50),
-                  colorScheme.primary.withAlpha(20),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
+              color: (iconColor ?? kPrimary).withAlpha(18),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 20, color: colorScheme.primary),
+            child: Icon(icon, color: iconColor ?? kPrimary, size: 18),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 2),
-                Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: valueColor ?? kText,
+                    letterSpacing: -0.3,
+                  ),
+                ),
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
