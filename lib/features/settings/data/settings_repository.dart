@@ -1,8 +1,12 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/supabase_config.dart';
 import '../domain/shop_settings_model.dart';
 
 class SettingsRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
+
+  /// Safaricom must POST STK results here so `mpesa-callback` can write `mpesa_callback_results` for the app to poll.
+  String _defaultMpesaStkCallbackUrl() => kMpesaCallbackEdgeUrl;
 
   Future<ShopSettingsModel> getSettings() async {
     final response = await _supabase
@@ -16,7 +20,7 @@ class SettingsRepository {
     const _defaultShortcode = '3560959';
     const _defaultTillNumber = '6509715';
     const _defaultPasskey = 'fc087de2729c7ff67b2b2b3aacc2068039fc56284c676d56679ef86f70640d8d';
-    const _defaultCallbackUrl = 'https://www.pixelsolutions.co.ke/api/mpesa/callback';
+    final _defaultCallbackUrl = _defaultMpesaStkCallbackUrl();
     const _defaultConfirmationUrl = 'https://www.pixelsolutions.co.ke/api/mpesa/c2b/confirmation';
     const _defaultValidationUrl = 'https://www.pixelsolutions.co.ke/api/mpesa/c2b/validation';
     const _defaultBaseUrl = 'https://api.safaricom.co.ke';
@@ -31,7 +35,7 @@ class SettingsRepository {
         mpesaTillNumber: _defaultTillNumber,
         mpesaPasskey: _defaultPasskey,
         mpesaBaseUrl: _defaultBaseUrl,
-        mpesaCallbackUrl: _defaultCallbackUrl,
+        mpesaCallbackUrl: _defaultCallbackUrl.isNotEmpty ? _defaultCallbackUrl : 'https://www.pixelsolutions.co.ke/api/mpesa/callback',
         mpesaConfirmationUrl: _defaultConfirmationUrl,
         mpesaValidationUrl: _defaultValidationUrl,
         mpesaTransactionType: 'CustomerBuyGoodsOnline',
@@ -56,7 +60,11 @@ class SettingsRepository {
       mpesaConsumerSecret: base.mpesaConsumerSecret.isNotEmpty ? base.mpesaConsumerSecret : _defaultConsumerSecret,
       mpesaTillNumber: base.mpesaTillNumber.isNotEmpty ? base.mpesaTillNumber : _defaultTillNumber,
       mpesaBaseUrl: base.mpesaBaseUrl.isNotEmpty ? base.mpesaBaseUrl : _defaultBaseUrl,
-      mpesaCallbackUrl: base.mpesaCallbackUrl.isNotEmpty ? base.mpesaCallbackUrl : _defaultCallbackUrl,
+      mpesaCallbackUrl: base.mpesaCallbackUrl.isNotEmpty
+          ? base.mpesaCallbackUrl
+          : (_defaultCallbackUrl.isNotEmpty
+              ? _defaultCallbackUrl
+              : 'https://www.pixelsolutions.co.ke/api/mpesa/callback'),
       mpesaConfirmationUrl: base.mpesaConfirmationUrl.isNotEmpty ? base.mpesaConfirmationUrl : _defaultConfirmationUrl,
       mpesaValidationUrl: base.mpesaValidationUrl.isNotEmpty ? base.mpesaValidationUrl : _defaultValidationUrl,
       mpesaTransactionType: base.mpesaTransactionType.isNotEmpty ? base.mpesaTransactionType : 'CustomerBuyGoodsOnline',

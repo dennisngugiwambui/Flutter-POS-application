@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/profile_model.dart';
-import 'register_page.dart';
+import 'admin_user_detail_page.dart';
+import 'create_employee_sheet.dart';
 
 class AdminUsersPage extends ConsumerStatefulWidget {
   const AdminUsersPage({super.key});
@@ -163,14 +164,15 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RegisterPage()),
-          );
-        },
+        onPressed: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          builder: (_) => const CreateEmployeeSheet(),
+        ).then((_) => _loadUsers()),
         icon: const Icon(Icons.person_add_rounded),
-        label: const Text('Add user'),
+        label: const Text('Add employee'),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
@@ -193,7 +195,13 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final roleColor = isAdmin ? colorScheme.primary : colorScheme.tertiary;
 
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => AdminUserDetailPage(user: user)),
+      ).then((_) => _loadUsers()),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withAlpha(80),
@@ -274,6 +282,7 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
           ],
         ),
       ),
+    ),
     );
   }
 }

@@ -129,7 +129,25 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        final msg = e.toString();
+        if (msg.contains("Could not find the 'mpesa_") || msg.contains('PGRST204')) {
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text('Supabase database update needed'),
+              content: const Text(
+                'Your Supabase `shop_configs` table is missing the new M-Pesa columns. '
+                'Open Supabase Dashboard → SQL Editor and run the migration `20260316000000_mpesa_full_config.sql`, '
+                'then reopen the app and Save Settings again.',
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
       }
     } finally {
       setState(() => _isLoading = false);

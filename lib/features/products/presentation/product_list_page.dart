@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shop/components/product/product_card.dart';
 import 'product_provider.dart';
 import '../domain/product_model.dart';
 import 'product_detail_page.dart';
@@ -66,7 +67,7 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
                       crossAxisCount: 2,
                       mainAxisSpacing: 12,
                       crossAxisSpacing: 12,
-                      childAspectRatio: 0.82,
+                      childAspectRatio: 0.58,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) => _buildProductCard(context, ref, filtered[index], colorScheme),
@@ -126,65 +127,75 @@ class _ProductListPageState extends ConsumerState<ProductListPage> {
     final isLowStock = product.stockQuantity <= 5;
     final stockColor = isLowStock ? colorScheme.error : const Color(0xFF10B981);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withAlpha(60),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outline.withAlpha(40)),
-      ),
-      child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product)))
-            .then((_) => ref.invalidate(productsProvider)),
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                height: 100,
+    return Center(
+      child: SizedBox(
+        width: 160,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ProductCard(
+              image: product.imageUrl,
+              brandName: 'POS',
+              title: product.name,
+              price: product.sellingPrice,
+              press: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ProductDetailPage(product: product)),
+                );
+                if (!context.mounted) return;
+                ref.invalidate(productsProvider);
+              },
+            ),
+            // Stock indicator
+            Positioned(
+              top: 0,
+              left: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(14),
+                  color: stockColor.withAlpha(25),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: product.imageUrl.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Image.network(product.imageUrl, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(Icons.inventory_2_rounded, color: colorScheme.primary, size: 32)),
-                      )
-                    : Icon(Icons.inventory_2_rounded, color: colorScheme.primary, size: 32),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                product.name,
-                style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.onSurface, fontSize: 14),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text('\$${product.sellingPrice.toStringAsFixed(2)}', style: TextStyle(color: const Color(0xFF10B981), fontWeight: FontWeight.w800, fontSize: 14)),
-              const Spacer(),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: stockColor.withAlpha(25),
-                      borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isLowStock ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+                      size: 12,
+                      color: stockColor,
                     ),
-                    child: Text('${product.stockQuantity} in stock', style: TextStyle(color: stockColor, fontWeight: FontWeight.w700, fontSize: 11)),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => _confirmDelete(context, ref, product),
-                    child: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 18),
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    Text(
+                      isLowStock ? 'Low' : 'Stock',
+                      style: TextStyle(color: stockColor, fontWeight: FontWeight.w800, fontSize: 10),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+            // Delete button (overlay)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _confirmDelete(context, ref, product),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withAlpha(220),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: colorScheme.outline.withAlpha(50)),
+                    ),
+                    child: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 16),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

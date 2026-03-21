@@ -1,31 +1,31 @@
 Pixel POS – iOS build (IPA)
 ==========================
 
-iOS apps cannot be built on Windows. They require:
+iOS cannot be built on Windows. You need:
 
-  • A Mac with macOS
-  • Xcode installed
-  • Apple Developer account (for signing)
+  • macOS
+  • Xcode
+  • Apple Developer account (signing)
 
-To create the iOS release (version 1.0.1):
+Release version (match pubspec): 1.0.3 (build 4)
 
-  1. Open this project on a Mac (copy the whole POS folder or clone from git).
-  2. In Terminal, from the project root (POS/), run:
+  1. Copy the whole POS project to a Mac (or clone).
+  2. From project root:
 
-       flutter build ipa --build-name=1.0.1 --build-number=2
+       flutter pub get
+       flutter build ipa --build-name=1.0.3 --build-number=3
 
-  3. In Xcode (open ios/Runner.xcworkspace), set your Team under
-     Signing & Capabilities for the Runner target.
-  4. After a successful build, copy the IPA from:
+  3. In Xcode (ios/Runner.xcworkspace): Runner target → Signing & Capabilities → your Team.
 
-       build/ios/ipa/
+  4. After a successful build, find the IPA under build/ios/ipa/
 
-     into this folder and rename it to:
+  5. Copy it to:
 
-       Pixel_POS_ios_1.0.1.ipa
+       final app/Pixel_POS_ios_1.0.3_build4.ipa
 
-Alternatively, run the script from a Mac (from project root):
+Or run (from project root on Mac):
 
-  bash "final app/build_ios.sh"
+  chmod +x "final app/build_ios.sh"
+  "./final app/build_ios.sh"
 
-It will build and copy the IPA into this folder.
+That script runs tests, builds the IPA, removes old Pixel_POS_ios_*.ipa in final app, and copies the new file.

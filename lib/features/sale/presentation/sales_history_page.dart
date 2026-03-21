@@ -13,6 +13,7 @@ import '../data/sales_repository.dart';
 import '../../auth/domain/profile_model.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../../dashboard_provider.dart';
+import '../../../core/money_format.dart';
 
 final salesRepositoryProvider = Provider<SalesRepository>((ref) => SalesRepository());
 
@@ -184,7 +185,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text('\$${s.totalAmount.toStringAsFixed(2)}', style: const pw.TextStyle(fontSize: 10)),
+                      child: pw.Text(formatKes(s.totalAmount), style: const pw.TextStyle(fontSize: 10)),
                     ),
                   ],
                 ),
@@ -195,7 +196,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           pw.Align(
             alignment: pw.Alignment.centerRight,
             child: pw.Text(
-              'Total: \$${total.toStringAsFixed(2)}',
+              'Total: ${formatKes(total)}',
               style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
             ),
           ),
@@ -238,7 +239,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 children: [
                   Text('Products sold', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                   const Spacer(),
-                  Text('\$${sale.totalAmount.toStringAsFixed(2)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: colorScheme.primary)),
+                  Text(formatKes(sale.totalAmount), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: colorScheme.primary)),
                 ],
               ),
             ),
@@ -281,8 +282,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                       ),
                               ),
                               title: Text(i.productName, style: TextStyle(fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
-                              subtitle: Text('Qty: ${i.quantity} × \$${i.unitPrice.toStringAsFixed(2)}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
-                              trailing: Text('\$${i.totalPrice.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.primary)),
+                              subtitle: Text('Qty: ${i.quantity} × ${formatKes(i.unitPrice)}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
+                              trailing: Text(formatKes(i.totalPrice), style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.primary)),
                             ),
                           ),
                         );
@@ -429,24 +430,82 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                         itemCount: _sales.length,
                         itemBuilder: (context, index) {
                           final s = _sales[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: colorScheme.primaryContainer,
-                                child: Icon(Icons.receipt_rounded, color: colorScheme.onPrimaryContainer),
-                              ),
-                              title: Text(
-                                '\$${s.totalAmount.toStringAsFixed(2)}',
-                                style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.onSurface),
-                              ),
-                              subtitle: Text(
-                                '${dateFormat.format(s.createdAt)} • ${s.sellerName ?? 'Unknown'}',
-                                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
-                              ),
-                              trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant),
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest.withAlpha(100),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: colorScheme.outline.withAlpha(40)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colorScheme.shadow.withAlpha(20),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: InkWell(
                               onTap: () => _showSaleItems(context, s, colorScheme),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            colorScheme.primary.withAlpha(50),
+                                            colorScheme.primary.withAlpha(20),
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Icon(Icons.receipt_rounded, color: colorScheme.primary, size: 24),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            formatKes(s.totalAmount),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 16,
+                                              color: colorScheme.onSurface,
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '${dateFormat.format(s.createdAt)} • ${s.sellerName ?? 'Unknown'}',
+                                            style: TextStyle(
+                                              color: colorScheme.onSurfaceVariant,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primary.withAlpha(15),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: colorScheme.primary,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -454,20 +513,74 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           ),
           if (_sales.isNotEmpty)
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primary.withAlpha(20),
+                    colorScheme.primary.withAlpha(8),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border(
+                  top: BorderSide(color: colorScheme.primary.withAlpha(40), width: 1),
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total', style: TextStyle(fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
-                  Text(
-                    '\$${_sales.fold<double>(0, (s, e) => s + e.totalAmount).toStringAsFixed(2)}',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.primary),
-                  ),
-                ],
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.primary.withAlpha(60),
+                            colorScheme.primary.withAlpha(30),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(Icons.account_balance_wallet_rounded, color: colorScheme.primary, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total Revenue',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            formatKes(_sales.fold<double>(0, (s, e) => s + e.totalAmount)),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.primary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${_sales.length} sale${_sales.length == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
         ],

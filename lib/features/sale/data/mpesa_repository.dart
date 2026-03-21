@@ -22,37 +22,51 @@ class MpesaRepository {
     required String phone,
     String reference = 'POS',
   }) async {
-    final res = await _supabase.functions.invoke(
-      'mpesa-stk-push',
-      body: {
-        'amount': amount,
-        'phone': phone.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^0'), '254'),
-        'reference': reference,
-      },
-    );
-
-    if (res.status != 200) {
-      final err = res.data is Map ? (res.data['error'] ?? res.data['detail'] ?? res.data) : res.data;
-      return MpesaStkResult(
-        success: false,
-        message: err?.toString() ?? 'STK push request failed',
+    try {
+      final res = await _supabase.functions.invoke(
+        'mpesa-stk-push',
+        body: {
+          'amount': amount,
+          'phone': phone.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^0'), '254'),
+          'reference': reference,
+        },
       );
-    }
 
-    final data = res.data as Map<String, dynamic>?;
-    if (data == null || data['success'] != true) {
-      return MpesaStkResult(
-        success: false,
-        message: data?['error']?.toString() ?? data?['message']?.toString() ?? 'No checkout ID',
-      );
-    }
+      if (res.status != 200) {
+        final err = res.data is Map ? (res.data['error'] ?? res.data['detail'] ?? res.data) : res.data;
+        return MpesaStkResult(
+          success: false,
+          message: err?.toString() ?? 'STK push request failed',
+        );
+      }
 
-    final checkoutRequestId = data['checkoutRequestId']?.toString();
-    if (checkoutRequestId == null || checkoutRequestId.isEmpty) {
-      return MpesaStkResult(success: false, message: 'No checkout request ID returned');
-    }
+      final data = res.data as Map<String, dynamic>?;
+      if (data == null || data['success'] != true) {
+        return MpesaStkResult(
+          success: false,
+          message: data?['error']?.toString() ?? data?['message']?.toString() ?? 'No checkout ID',
+        );
+      }
 
-    return _pollForResult(checkoutRequestId);
+      final checkoutRequestId = data['checkoutRequestId']?.toString();
+      if (checkoutRequestId == null || checkoutRequestId.isEmpty) {
+        return MpesaStkResult(success: false, message: 'No checkout request ID returned');
+      }
+
+      return _pollForResult(checkoutRequestId);
+    } on FunctionException catch (e) {
+      // Most common cause: Edge Function not deployed (404 NOT_FOUND)
+      if (e.status == 404) {
+        return const MpesaStkResult(
+          success: false,
+          message: 'M-Pesa service is not configured (missing Edge Function). Deploy `mpesa-stk-push` and `mpesa-callback` on Supabase, then try again.',
+          resultCode: -404,
+        );
+      }
+      return MpesaStkResult(success: false, message: 'M-Pesa error: ${e.toString()}', resultCode: e.status);
+    } catch (e) {
+      return MpesaStkResult(success: false, message: 'M-Pesa error: $e');
+    }
   }
 
   Future<MpesaStkResult> _pollForResult(String checkoutRequestId) async {

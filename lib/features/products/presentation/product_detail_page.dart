@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../core/money_format.dart';
 import '../domain/product_model.dart';
 import 'edit_product_page.dart';
+import 'package:shop/screens/product/views/components/product_info.dart';
 
 class ProductDetailPage extends StatelessWidget {
   final ProductModel product;
@@ -10,6 +12,7 @@ class ProductDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLowStock = product.stockQuantity <= 5;
+    final isAvailable = product.stockQuantity > 0;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -94,21 +97,21 @@ class ProductDetailPage extends StatelessWidget {
               ),
             ),
           ),
+          ProductInfo(
+            brand: 'POS',
+            title: product.name,
+            description:
+                'Barcode: ${product.barcode}\nBuying: ${formatKes(product.buyingPrice)}\nSelling: ${formatKes(product.sellingPrice)}',
+            rating: 4.6,
+            numOfReviews: 0,
+            isAvailable: isAvailable,
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    product.name,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: colorScheme.onSurface,
-                      letterSpacing: -0.5,
-                    ) ?? TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: colorScheme.onSurface),
-                  ),
-                  const SizedBox(height: 8),
                   if (isLowStock)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -130,8 +133,8 @@ class ProductDetailPage extends StatelessWidget {
                     colorScheme: colorScheme,
                     children: [
                       _DetailRow(label: 'Barcode', value: product.barcode, icon: Icons.qr_code_2_rounded),
-                      _DetailRow(label: 'Buying price', value: '\$${product.buyingPrice.toStringAsFixed(2)}', icon: Icons.shopping_bag_outlined),
-                      _DetailRow(label: 'Selling price', value: '\$${product.sellingPrice.toStringAsFixed(2)}', icon: Icons.sell_rounded),
+                      _DetailRow(label: 'Buying price', value: formatKes(product.buyingPrice), icon: Icons.shopping_bag_outlined),
+                      _DetailRow(label: 'Selling price', value: formatKes(product.sellingPrice), icon: Icons.sell_rounded),
                       _DetailRow(
                         label: 'Stock',
                         value: '${product.stockQuantity}',
@@ -176,7 +179,7 @@ class _DetailCard extends StatelessWidget {
         children: [
           for (int i = 0; i < children.length; i++) ...[
             children[i],
-            if (i < children.length - 1) Divider(height: 1, color: colorScheme.outline.withAlpha(50), indent: 56),
+            if (i < children.length - 1) Divider(height: 1, color: colorScheme.outline.withAlpha(50), indent: 60),
           ],
         ],
       ),
@@ -200,11 +203,18 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withAlpha(80),
-              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primary.withAlpha(50),
+                  colorScheme.primary.withAlpha(20),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, size: 20, color: colorScheme.primary),
           ),

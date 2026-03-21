@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import 'register_page.dart';
 import '../../dashboard/presentation/main_shell.dart';
+import '../../../dashboard_provider.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -56,6 +57,25 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
         emailOrPhone: _emailController.text.trim(),
         password: _passwordController.text,
       );
+
+      // Block pending/inactive users from entering the app.
+      try {
+        final profile = await ref.read(profileProvider.future);
+        if (profile != null && profile.isActive == false) {
+          await ref.read(authRepositoryProvider).signOut();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Account pending admin approval. Please contact your administrator.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          return;
+        }
+      } catch (_) {}
+
       if (mounted) {
         Navigator.pushReplacement(
           context,

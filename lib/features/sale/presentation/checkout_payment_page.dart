@@ -6,6 +6,7 @@ import '../data/mpesa_repository.dart';
 import '../../products/presentation/product_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../../dashboard_provider.dart';
+import '../../../core/money_format.dart';
 
 enum PaymentMethod { cash, stk }
 
@@ -67,7 +68,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
     final received = _amountReceived;
     final total = widget.cartState.totalAmount;
     if (received == null || received < total) {
-      setState(() => _changeError = 'Amount received must be at least \$${total.toStringAsFixed(2)}');
+      setState(() => _changeError = 'Amount received must be at least ${formatKes(total)}');
       return;
     }
     setState(() { _isSubmitting = true; _changeError = null; });
@@ -86,11 +87,11 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
       final change = _change;
       await _completeSaleAndPop(
         success: true,
-        message: 'Success. Change: \$${change.toStringAsFixed(2)}',
+        message: 'Success. Change: ${formatKes(change)}',
       );
     } catch (e) {
       if (!mounted) return;
-      await _completeSaleAndPop(success: false, message: 'Failed. $e');
+      setState(() => _changeError = 'Could not complete sale: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -107,8 +108,10 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
       final settings = await ref.read(settingsProvider.future);
       if (!settings.isMpesaConfigured) {
         if (!mounted) return;
-        setState(() => _changeError = 'Configure M-Pesa in Shop Settings (Consumer Key, Secret, Passkey, Till, Callback URL).');
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _changeError = 'Configure M-Pesa in Shop Settings (Consumer Key, Secret, Passkey, Till, Callback URL).';
+          _isSubmitting = false;
+        });
         return;
       }
 
@@ -122,8 +125,10 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
 
       if (!mounted) return;
       if (!result.success) {
-        await _completeSaleAndPop(success: false, message: result.message);
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _changeError = result.message;
+          _isSubmitting = false;
+        });
         return;
       }
 
@@ -141,7 +146,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
       await _completeSaleAndPop(success: true, message: 'Payment received. STK completed for $phone');
     } catch (e) {
       if (!mounted) return;
-      await _completeSaleAndPop(success: false, message: 'Failed. $e');
+      setState(() => _changeError = 'M-Pesa request failed: $e');
     }
     if (mounted) setState(() => _isSubmitting = false);
   }
@@ -152,6 +157,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
     final colorScheme = theme.colorScheme;
     final total = widget.cartState.totalAmount;
     final itemCount = widget.cartState.items.fold<int>(0, (sum, i) => sum + i.quantity);
+    final itemCountLabel = itemCount == 1 ? '1 item' : '$itemCount items';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -181,11 +187,11 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
                   Text('Total', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
                   const SizedBox(height: 4),
                   Text(
-                    '\$${total.toStringAsFixed(2)}',
+                    formatKes(total),
                     style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colorScheme.primary),
                   ),
                   const SizedBox(height: 4),
-                  Text('$itemCount items', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
+                  Text(itemCountLabel, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
                 ],
               ),
             ),
@@ -195,11 +201,11 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
             Row(
               children: [
                 Expanded(
-                  child: _methodChip(PaymentMethod.cash, 'Cash', Icons.payments_rounded, colorScheme),
+                  child: _methodTile(PaymentMethod.cash, 'Cash', Icons.payments_rounded, colorScheme),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _methodChip(PaymentMethod.stk, 'STK Push', Icons.phone_android_rounded, colorScheme),
+                  child: _methodTile(PaymentMethod.stk, 'M-Pesa STK', Icons.phone_android_rounded, colorScheme),
                 ),
               ],
             ),
@@ -242,29 +248,43 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
     );
   }
 
-  Widget _methodChip(PaymentMethod method, String label, IconData icon, ColorScheme colorScheme) {
+  Widget _methodTile(PaymentMethod method, String label, IconData icon, ColorScheme colorScheme) {
     final selected = _paymentMethod == method;
+    final fg = selected ? colorScheme.onPrimaryContainer : colorScheme.onSurface;
+    final muted = selected ? colorScheme.onPrimaryContainer.withAlpha(220) : colorScheme.onSurfaceVariant;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => setState(() { _paymentMethod = method; _changeError = null; }),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+        onTap: () => setState(() {
+          _paymentMethod = method;
+          _changeError = null;
+        }),
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
           decoration: BoxDecoration(
-            color: selected ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(14),
+            color: selected ? colorScheme.primaryContainer.withAlpha(220) : colorScheme.surfaceContainerHighest.withAlpha(200),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outline.withAlpha(80),
+              color: selected ? colorScheme.primary : colorScheme.outline.withAlpha(70),
               width: selected ? 2 : 1,
             ),
+            boxShadow: selected
+                ? [BoxShadow(color: colorScheme.primary.withAlpha(45), blurRadius: 12, offset: const Offset(0, 4))]
+                : null,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 22, color: selected ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: selected ? colorScheme.onPrimaryContainer : colorScheme.onSurface)),
+              Icon(icon, size: 28, color: selected ? colorScheme.primary : muted),
+              const SizedBox(height: 10),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.15, color: fg),
+              ),
             ],
           ),
         ),
@@ -283,7 +303,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
         decoration: InputDecoration(
           hintText: '0.00',
-          prefixText: '\$ ',
+          prefixText: 'Ksh ',
           filled: true,
           fillColor: colorScheme.surfaceContainerHighest,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -301,7 +321,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Change to give', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
-              Text('\$${_change.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.tertiary)),
+              Text(formatKes(_change), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.tertiary)),
             ],
           ),
         ),

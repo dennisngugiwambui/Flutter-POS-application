@@ -1,0 +1,8 @@
+{
+  "name": "pos-supabase-cli",
+  "private": true,
+  "description": "Local Supabase CLI for Pixel POS deploys (avoids Windows npx EBUSY cache locks)",
+  "devDependencies": {
+    "supabase": "^2.82.0"
+  }
+}

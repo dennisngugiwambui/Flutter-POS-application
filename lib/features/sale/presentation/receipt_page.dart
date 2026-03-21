@@ -7,7 +7,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
-import 'cart_provider.dart';
+import '../../../core/money_format.dart';
 import '../../settings/domain/shop_settings_model.dart';
 import '../../settings/presentation/settings_provider.dart';
 
@@ -96,8 +96,8 @@ class ReceiptPage extends ConsumerWidget {
                       pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          pw.Text('$qty x \$${price.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 9)),
-                          pw.Text('\$${lineTotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 9)),
+                          pw.Text('$qty x ${formatKes(price)}', style: pw.TextStyle(fontSize: 9)),
+                          pw.Text(formatKes(lineTotal), style: pw.TextStyle(fontSize: 9)),
                         ],
                       ),
                     ],
@@ -109,7 +109,7 @@ class ReceiptPage extends ConsumerWidget {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('TOTAL', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                  pw.Text('\$${totalAmount.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(formatKes(totalAmount), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
                 ],
               ),
               pw.SizedBox(height: 8),
@@ -133,7 +133,7 @@ class ReceiptPage extends ConsumerWidget {
 
   Widget _buildReceiptView(BuildContext context, WidgetRef ref, ShopSettingsModel shopSettings, DateFormat dateFormat, DateTime now) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0D0F14),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -167,19 +167,52 @@ class ReceiptPage extends ConsumerWidget {
                 ),
                 child: Column(
                   children: [
-                    // Shop Header
-                    if (shopSettings.logoUrl.isNotEmpty) 
-                      Image.network(shopSettings.logoUrl, height: 60, errorBuilder: (c, e, s) => const SizedBox())
-                    else
-                      const Icon(Icons.storefront_rounded, size: 60, color: Color(0xFF6366F1)),
-                    
-                    const SizedBox(height: 12),
-                    Text(
-                      shopSettings.shopName,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF6C63FF), Color(0xFF9C8FFF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          if (shopSettings.logoUrl.isNotEmpty)
+                            Image.network(
+                              shopSettings.logoUrl,
+                              height: 50,
+                              errorBuilder: (c, e, s) => const SizedBox(),
+                            )
+                          else
+                            const Icon(Icons.storefront_rounded, size: 48, color: Colors.white),
+                          const SizedBox(height: 8),
+                          Text(
+                            shopSettings.shopName,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          if (shopSettings.address.isNotEmpty)
+                            Text(
+                              shopSettings.address,
+                              style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 12),
+                            ),
+                          if (shopSettings.poBox.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'PO BOX: ${shopSettings.poBox}',
+                                style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 12),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                    Text(shopSettings.address, style: const TextStyle(color: Colors.black54, fontSize: 13)),
-                    Text('PO BOX: ${shopSettings.poBox}', style: const TextStyle(color: Colors.black54, fontSize: 13)),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -199,11 +232,11 @@ class ReceiptPage extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                                Text('${item.quantity} x \$${item.product.sellingPrice.toStringAsFixed(2)}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                                Text('${item.quantity} x ${formatKes(item.product.sellingPrice)}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
                               ],
                             ),
                           ),
-                          Text('\$${item.totalPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                          Text(formatKes(item.totalPrice), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
                         ],
                       ),
                     )),
@@ -214,8 +247,8 @@ class ReceiptPage extends ConsumerWidget {
                       children: [
                         const Text('TOTAL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
                         Text(
-                          '\$${totalAmount.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF6366F1)),
+                          formatKes(totalAmount),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF6C63FF)),
                         ),
                       ],
                     ),
@@ -237,12 +270,9 @@ class ReceiptPage extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: () {
-                  ref.read(cartProvider.notifier).clearCart();
-                  Navigator.pop(context);
-                },
+                onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
+                  backgroundColor: const Color(0xFF6C63FF),
                   padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),

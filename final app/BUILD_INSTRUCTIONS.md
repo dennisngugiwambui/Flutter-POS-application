@@ -1,39 +1,39 @@
-# Pixel POS – Build Instructions
+# Pixel POS – Build instructions
 
-Use these commands from the **project root** (`POS/`).
+Run from the **project root** (`POS/`), same folder as `pubspec.yaml`.
+
+**Version** is defined in `pubspec.yaml` (e.g. `1.0.3+4` → `--build-name=1.0.3 --build-number=4`).
 
 ## Prerequisites
 
-- Flutter SDK installed and on PATH
-- Android: Android SDK (for APK)
-- iOS: macOS with Xcode and Apple Developer account (for IPA)
+- Flutter SDK on `PATH`
+- **Android:** Android SDK (for APK/AAB)
+- **iOS:** macOS + Xcode + Apple Developer (for IPA only)
 
-## Android APK (Windows / macOS / Linux)
+## Quick: copy builds into `final app/`
+
+- **Windows (CMD):** `final app\build_android.bat`
+- **Windows (PowerShell):** `.\build_to_final_app.ps1`
+- **macOS (iOS):** `chmod +x "final app/build_ios.sh" && "./final app/build_ios.sh"`
+
+These scripts remove older `Pixel_POS_android_*.apk` / `*.aab` (and iOS `Pixel_POS_ios_*.ipa` for the shell script) in `final app/` before copying the new outputs.
+
+## Android APK
 
 ```bash
 flutter clean
 flutter pub get
-flutter build apk --release --build-name=1.0.0 --build-number=1
+flutter test
+flutter build apk --release --build-name=1.0.3 --build-number=4
 ```
 
-**Output:** `build/app/outputs/flutter-apk/app-release.apk`
+**Output:** `build/app/outputs/flutter-apk/app-release.apk`  
+Copy to `final app/Pixel_POS_android_1.0.3_build4.apk` (or run the scripts above).
 
-Copy to this folder and rename, e.g.:
-
-- `Pixel_POS_android_1.0.0.apk`
-
-### Optional: obfuscation and debug symbols
+## Android App Bundle (Play Store)
 
 ```bash
-flutter build apk --release --obfuscate --split-debug-info=final\ app/debug-info-android --build-name=1.0.0 --build-number=1
-```
-
-Keep the `debug-info-android` folder for symbolication if you get crash reports.
-
-### App Bundle (for Google Play)
-
-```bash
-flutter build appbundle --release --build-name=1.0.0 --build-number=1
+flutter build appbundle --release --build-name=1.0.3 --build-number=4
 ```
 
 **Output:** `build/app/outputs/bundle/release/app-release.aab`
@@ -41,24 +41,16 @@ flutter build appbundle --release --build-name=1.0.0 --build-number=1
 ## iOS IPA (macOS only)
 
 ```bash
-flutter clean
-flutter pub get
-flutter build ipa --build-name=1.0.0 --build-number=1
+flutter build ipa --build-name=1.0.3 --build-number=4
 ```
 
-**Output:** `build/ios/ipa/` (e.g. `Pixel POS.ipa` or `Runner.ipa`)
+1. Open `ios/Runner.xcworkspace` in Xcode → **Signing & Capabilities** → Team / bundle ID.
+2. Copy the IPA from `build/ios/ipa/` to `final app/Pixel_POS_ios_1.0.3_build4.ipa` (or use `build_ios.sh`).
 
-Copy the IPA into this folder, e.g.:
+## Optional: obfuscation
 
-- `Pixel_POS_ios_1.0.0.ipa`
+```bash
+flutter build apk --release --obfuscate --split-debug-info=final_app_debug_info/android --build-name=1.0.3 --build-number=4
+```
 
-Before building:
-
-1. Open `ios/Runner.xcworkspace` in Xcode.
-2. Select the Runner target → Signing & Capabilities.
-3. Choose your Team and ensure “Automatically manage signing” is enabled (or set provisioning profile).
-4. Confirm the bundle ID matches your Apple Developer app.
-
----
-
-**Version format:** `--build-name=1.0.0` (user-facing), `--build-number=1` (build index).
+Keep the `split-debug-info` output for crash symbolication.

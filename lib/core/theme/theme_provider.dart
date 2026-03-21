@@ -5,7 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _keyThemeMode = 'theme_mode';
 
 class ThemeNotifier extends StateNotifier<ThemeMode> {
-  ThemeNotifier() : super(ThemeMode.dark) {
+  /// Default to light until (optional) saved preference loads.
+  ThemeNotifier() : super(ThemeMode.light) {
     _load();
   }
 

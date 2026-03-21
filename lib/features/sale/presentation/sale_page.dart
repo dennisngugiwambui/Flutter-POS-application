@@ -5,12 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:shop/components/cart_button.dart';
 import 'cart_provider.dart';
 import 'receipt_page.dart';
 import 'checkout_payment_page.dart';
 import '../../products/domain/product_model.dart';
 import '../../products/presentation/product_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../../core/money_format.dart';
 
 class SalePage extends ConsumerStatefulWidget {
   const SalePage({super.key});
@@ -249,7 +251,7 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
       ),
     );
     if (!mounted) return;
-    ref.read(cartProvider.notifier).clearCart();
+    // Only clear cart after a successful sale. Failed checkout or pressing back must keep items.
     if (result != null) {
       final success = result['success'] as bool? ?? false;
       final message = result['message'] as String? ?? (success ? 'Done.' : 'Failed.');
@@ -269,6 +271,7 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
         ),
       );
       if (success) {
+        ref.read(cartProvider.notifier).clearCart();
         final settings = await ref.read(settingsProvider.future);
         if (!mounted) return;
         await showModalBottomSheet<void>(
@@ -546,7 +549,7 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
                         style: TextStyle(color: onSurf.withAlpha(160), fontSize: 12),
                       ),
                       trailing: Text(
-                        '\$${p.sellingPrice.toStringAsFixed(2)}',
+                        formatKes(p.sellingPrice),
                         style: TextStyle(color: colorScheme.tertiary, fontWeight: FontWeight.w700),
                       ),
                       onTap: () async {
@@ -711,7 +714,7 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
                     Text(item.product.name, style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.onSurface, fontSize: 14)),
                     const SizedBox(height: 3),
                     Text(
-                      '\$${item.product.sellingPrice.toStringAsFixed(2)} each',
+                      '${formatKes(item.product.sellingPrice)} each',
                       style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
@@ -720,7 +723,7 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('\$${item.totalPrice.toStringAsFixed(2)}', style: TextStyle(color: colorScheme.tertiary, fontWeight: FontWeight.w800, fontSize: 14)),
+                  Text(formatKes(item.totalPrice), style: TextStyle(color: colorScheme.tertiary, fontWeight: FontWeight.w800, fontSize: 14)),
                   const SizedBox(height: 6),
                   Container(
                     decoration: BoxDecoration(
@@ -756,6 +759,10 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
 
   Widget _buildCheckoutFooter(BuildContext context, CartState cartState) {
     final colorScheme = Theme.of(context).colorScheme;
+    final lineQty = cartState.items.fold<int>(0, (sum, i) => sum + i.quantity);
+    final checkoutSubTitle = cartState.items.isEmpty
+        ? 'Tap to pay'
+        : (lineQty == 1 ? '1 item • Tap to pay' : '$lineQty items • Tap to pay');
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       decoration: BoxDecoration(
@@ -782,7 +789,7 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
                   children: [
                     Text('Total', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)),
                     Text(
-                      '\$${cartState.totalAmount.toStringAsFixed(2)}',
+                      formatKes(cartState.totalAmount),
                       style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: colorScheme.onSurface),
                     ),
                   ],
@@ -799,29 +806,25 @@ class _SalePageState extends ConsumerState<SalePage> with TickerProviderStateMix
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 58,
-              child: ElevatedButton(
-                onPressed: cartState.items.isEmpty ? null : () => _openCheckout(cartState),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: cartState.items.isEmpty ? colorScheme.surfaceContainerHighest : colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  elevation: 0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.point_of_sale_rounded, size: 20),
-                    const SizedBox(width: 10),
-                    Text(
-                      cartState.items.isEmpty ? 'Add items to checkout' : 'CHECKOUT',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1),
-                    ),
-                  ],
-                ),
+            const SizedBox(height: 8),
+            Opacity(
+              opacity: cartState.items.isEmpty ? 0.45 : 1,
+              child: CartButton(
+                price: cartState.totalAmount,
+                title: cartState.items.isEmpty ? 'Add items' : 'CHECKOUT',
+                subTitle: checkoutSubTitle,
+                press: () {
+                  if (cartState.items.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Scan or search to add items first.'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+                  _openCheckout(cartState);
+                },
               ),
             ),
           ],
