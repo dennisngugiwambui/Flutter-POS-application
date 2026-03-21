@@ -1,0 +1,2 @@
+# Safaricom cannot send a Supabase JWT — callback must be public.
+verify_jwt = false

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/supabase_config.dart';
-import 'core/theme/app_theme.dart';
+import 'core/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/auth/presentation/splash_page.dart';
 
@@ -32,14 +32,14 @@ class PosApp extends ConsumerWidget {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-      systemNavigationBarColor: isDark ? const Color(0xFF0D0F14) : const Color(0xFFF8FAFC),
+      systemNavigationBarColor: isDark ? const Color(0xFF151C19) : kSurface,
       systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
     ));
     return MaterialApp(
       title: 'Pixel POS',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: themeMode,
       home: const SplashPage(),
     );

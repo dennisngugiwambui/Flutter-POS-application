@@ -164,13 +164,23 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet(
+        onPressed: () => showModalBottomSheet<bool>(
           context: context,
           isScrollControlled: true,
           backgroundColor: Theme.of(context).colorScheme.surface,
           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
           builder: (_) => const CreateEmployeeSheet(),
-        ).then((_) => _loadUsers()),
+        ).then((created) {
+          if (created == true && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Employee created. You can activate/deactivate them in the list.'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          _loadUsers();
+        }),
         icon: const Icon(Icons.person_add_rounded),
         label: const Text('Add employee'),
       ),

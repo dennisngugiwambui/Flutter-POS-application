@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'cart_provider.dart';
-import '../data/mpesa_repository.dart';
+import '../../mpesa/mpesa_service.dart';
 import '../../products/presentation/product_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../../dashboard_provider.dart';
 import '../../../core/money_format.dart';
 
 enum PaymentMethod { cash, stk }
-
-final mpesaRepositoryProvider = Provider<MpesaRepository>((ref) => MpesaRepository());
 
 class CheckoutPaymentPage extends ConsumerStatefulWidget {
   final CartState cartState;
@@ -28,6 +26,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
   static const String _mpesaPrefix = '+254';
   bool _isSubmitting = false;
   String? _changeError;
+  String? _stkStatus;
 
   @override
   void dispose() {
@@ -102,31 +101,28 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
       setState(() => _changeError = 'Enter valid phone (9 digits after +254)');
       return;
     }
-    setState(() { _isSubmitting = true; _changeError = null; });
+    setState(() { _isSubmitting = true; _changeError = null; _stkStatus = null; });
     final phone = _fullMpesaPhone;
     try {
       final settings = await ref.read(settingsProvider.future);
-      if (!settings.isMpesaConfigured) {
-        if (!mounted) return;
-        setState(() {
-          _changeError = 'Configure M-Pesa in Shop Settings (Consumer Key, Secret, Passkey, Till, Callback URL).';
-          _isSubmitting = false;
-        });
-        return;
-      }
-
-      final repo = ref.read(mpesaRepositoryProvider);
       final total = widget.cartState.totalAmount;
-      final result = await repo.initiateStkPush(
-        amount: total,
+      final mpesa = ref.read(mpesaServiceProvider);
+      final result = await mpesa.pay(
         phone: phone,
-        reference: 'POS${DateTime.now().millisecondsSinceEpoch % 100000}',
+        amount: total,
+        settings: settings,
+        accountReference: 'POS${DateTime.now().millisecondsSinceEpoch % 100000}',
+        onStatusUpdate: (msg) {
+          if (!mounted) return;
+          setState(() => _stkStatus = msg);
+        },
       );
 
       if (!mounted) return;
       if (!result.success) {
         setState(() {
-          _changeError = result.message;
+          _changeError = result.errorMessage ?? result.message;
+          _stkStatus = null;
           _isSubmitting = false;
         });
         return;
@@ -143,10 +139,16 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
       }
       ref.invalidate(productsProvider);
       if (!mounted) return;
-      await _completeSaleAndPop(success: true, message: 'Payment received. STK completed for $phone');
+      final paidMsg = result.receiptNumber != null && result.receiptNumber!.isNotEmpty
+          ? 'Paid. M-Pesa receipt: ${result.receiptNumber}'
+          : 'Payment received. STK completed for $phone';
+      await _completeSaleAndPop(success: true, message: paidMsg);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _changeError = 'M-Pesa request failed: $e');
+      setState(() {
+        _changeError = 'M-Pesa request failed: $e';
+        _stkStatus = null;
+      });
     }
     if (mounted) setState(() => _isSubmitting = false);
   }
@@ -212,6 +214,10 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
             const SizedBox(height: 24),
             if (_paymentMethod == PaymentMethod.cash) ..._buildCashSection(colorScheme),
             if (_paymentMethod == PaymentMethod.stk) ..._buildStkSection(colorScheme),
+            if (_stkStatus != null && _paymentMethod == PaymentMethod.stk) ...[
+              const SizedBox(height: 8),
+              Text(_stkStatus!, style: TextStyle(color: colorScheme.primary, fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
             if (_changeError != null) ...[
               const SizedBox(height: 8),
               Text(_changeError!, style: TextStyle(color: colorScheme.error, fontSize: 13)),
@@ -258,6 +264,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
         onTap: () => setState(() {
           _paymentMethod = method;
           _changeError = null;
+          _stkStatus = null;
         }),
         borderRadius: BorderRadius.circular(18),
         child: AnimatedContainer(
