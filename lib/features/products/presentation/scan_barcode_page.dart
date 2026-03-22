@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -10,7 +12,7 @@ class ScanBarcodePage extends StatefulWidget {
 }
 
 class _ScanBarcodePageState extends State<ScanBarcodePage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     facing: CameraFacing.back,
@@ -26,13 +28,13 @@ class _ScanBarcodePageState extends State<ScanBarcodePage>
   );
 
   bool _hasResult = false;
-  bool _torchOn = false;
   late AnimationController _scanAnim;
   late Animation<double> _scanLine;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scanAnim = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -45,9 +47,26 @@ class _ScanBarcodePageState extends State<ScanBarcodePage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _scanAnim.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        unawaited(_controller.stop());
+        break;
+      case AppLifecycleState.resumed:
+        if (mounted && !_hasResult) unawaited(_controller.start());
+        break;
+      default:
+        break;
+    }
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -99,31 +118,36 @@ class _ScanBarcodePageState extends State<ScanBarcodePage>
         ),
         centerTitle: true,
         actions: [
-          GestureDetector(
-            onTap: () {
-              _controller.toggleTorch();
-              setState(() => _torchOn = !_torchOn);
-            },
-            child: Container(
-              margin: const EdgeInsets.all(8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _torchOn
-                    ? const Color(0xFFFFB347).withAlpha(80)
-                    : Colors.white.withAlpha(30),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: _torchOn
-                      ? const Color(0xFFFFB347).withAlpha(150)
-                      : Colors.white.withAlpha(40),
+          ListenableBuilder(
+            listenable: _controller,
+            builder: (context, _) {
+              final torch = _controller.value.torchState;
+              if (torch == TorchState.unavailable) return const SizedBox.shrink();
+              final on = torch == TorchState.on || torch == TorchState.auto;
+              return GestureDetector(
+                onTap: () => unawaited(_controller.toggleTorch()),
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: on
+                        ? const Color(0xFFFFB347).withAlpha(80)
+                        : Colors.white.withAlpha(30),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: on
+                          ? const Color(0xFFFFB347).withAlpha(150)
+                          : Colors.white.withAlpha(40),
+                    ),
+                  ),
+                  child: Icon(
+                    on ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                    color: on ? const Color(0xFFFFB347) : Colors.white,
+                    size: 20,
+                  ),
                 ),
-              ),
-              child: Icon(
-                _torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                color: _torchOn ? const Color(0xFFFFB347) : Colors.white,
-                size: 20,
-              ),
-            ),
+              );
+            },
           ),
         ],
       ),

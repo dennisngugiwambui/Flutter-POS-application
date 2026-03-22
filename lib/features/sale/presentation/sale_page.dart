@@ -6,6 +6,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/theme_context.dart';
 import '../../dashboard/presentation/main_shell.dart';
 import '../../../core/money_format.dart';
 import '../../../core/ui_components.dart';
@@ -24,7 +25,7 @@ class SalePage extends ConsumerStatefulWidget {
   ConsumerState<SalePage> createState() => _SalePageState();
 }
 
-class _SalePageState extends ConsumerState<SalePage> {
+class _SalePageState extends ConsumerState<SalePage> with WidgetsBindingObserver {
   final _searchCtrl = TextEditingController();
   final _scannerCtrl = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
@@ -47,10 +48,33 @@ class _SalePageState extends ConsumerState<SalePage> {
   String? _lastBarcode;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchCtrl.dispose();
     _scannerCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_stopScannerIfOpen());
+    }
+  }
+
+  /// Fully releases the camera when leaving POS tab, app switcher, or lock screen.
+  Future<void> _stopScannerIfOpen() async {
+    if (!_scannerOpen) return;
+    await _scannerCtrl.stop();
+    if (mounted) setState(() => _scannerOpen = false);
   }
 
   Future<void> _ensureCamera() async {
@@ -206,8 +230,12 @@ class _SalePageState extends ConsumerState<SalePage> {
     final productsAsync = ref.watch(productsProvider);
     final lineQty = cartState.items.fold<int>(0, (s, i) => s + i.quantity);
 
+    ref.listen<int>(mainShellTabProvider, (prev, next) {
+      if (next != 2) unawaited(_stopScannerIfOpen());
+    });
+
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: context.appBg,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -221,13 +249,13 @@ class _SalePageState extends ConsumerState<SalePage> {
                     onTap: () => MainShell.shellScaffoldKey.currentState?.openDrawer(),
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'New Sale',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
-                        color: kText,
+                        color: context.appText,
                         letterSpacing: -0.6,
                       ),
                     ),
@@ -239,13 +267,13 @@ class _SalePageState extends ConsumerState<SalePage> {
                         await _ensureCamera();
                         if (!mounted) return;
                         await _scannerCtrl.start();
+                        if (mounted) setState(() => _scannerOpen = true);
                       } else {
-                        await _scannerCtrl.stop();
+                        await _stopScannerIfOpen();
                       }
-                      setState(() => _scannerOpen = !_scannerOpen);
                     },
-                    bg: _scannerOpen ? kPrimary.withAlpha(15) : kSurface,
-                    iconColor: _scannerOpen ? kPrimary : kText,
+                    bg: _scannerOpen ? kPrimary.withAlpha(15) : context.appSurface,
+                    iconColor: _scannerOpen ? kPrimary : context.appText,
                   ),
                 ],
               ),
@@ -264,6 +292,33 @@ class _SalePageState extends ConsumerState<SalePage> {
                         MobileScanner(
                           controller: _scannerCtrl,
                           onDetect: _onBarcodeDetected,
+                        ),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: ListenableBuilder(
+                            listenable: _scannerCtrl,
+                            builder: (context, _) {
+                              final torch = _scannerCtrl.value.torchState;
+                              if (torch == TorchState.unavailable) {
+                                return const SizedBox.shrink();
+                              }
+                              final on = torch == TorchState.on || torch == TorchState.auto;
+                              return Material(
+                                color: Colors.black.withAlpha(120),
+                                borderRadius: BorderRadius.circular(14),
+                                child: IconButton(
+                                  tooltip: on ? 'Turn flash off' : 'Turn flash on',
+                                  onPressed: () async => _scannerCtrl.toggleTorch(),
+                                  icon: Icon(
+                                    on ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                                    color: on ? const Color(0xFFFFB347) : Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                         Center(
                           child: Container(
@@ -325,9 +380,9 @@ class _SalePageState extends ConsumerState<SalePage> {
                           _searchCtrl.clear();
                           setState(() => _query = '');
                         },
-                        child: const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Icon(Icons.close_rounded, color: kTextMuted, size: 18),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(Icons.close_rounded, color: context.appTextMuted, size: 18),
                         ),
                       )
                     : null,
@@ -343,17 +398,17 @@ class _SalePageState extends ConsumerState<SalePage> {
                       child: Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: kSurface,
+                          color: context.appSurface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: kBorder, width: 0.9),
+                          border: Border.all(color: context.appBorder, width: 0.9),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.search_off_rounded, color: kTextMuted, size: 18),
-                            SizedBox(width: 10),
+                            Icon(Icons.search_off_rounded, color: context.appTextMuted, size: 18),
+                            const SizedBox(width: 10),
                             Text(
                               'No products found',
-                              style: TextStyle(color: kTextSub, fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(color: context.appTextSub, fontSize: 13, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -364,11 +419,11 @@ class _SalePageState extends ConsumerState<SalePage> {
                     margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                     constraints: const BoxConstraints(maxHeight: 220),
                     decoration: BoxDecoration(
-                      color: kSurface,
+                      color: context.appSurface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: kBorder, width: 0.9),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x100A2018), blurRadius: 16, offset: Offset(0, 6)),
+                      border: Border.all(color: context.appBorder, width: 0.9),
+                      boxShadow: [
+                        BoxShadow(color: Theme.of(context).colorScheme.shadow.withAlpha(28), blurRadius: 16, offset: const Offset(0, 6)),
                       ],
                     ),
                     child: ClipRRect(
@@ -406,10 +461,10 @@ class _SalePageState extends ConsumerState<SalePage> {
                                         children: [
                                           Text(
                                             p.name,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w700,
-                                              color: kText,
+                                              color: context.appText,
                                             ),
                                           ),
                                           const SizedBox(height: 2),
@@ -470,9 +525,9 @@ class _SalePageState extends ConsumerState<SalePage> {
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
               child: Row(
                 children: [
-                  const Text(
+                  Text(
                     'Cart',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kText),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: context.appText),
                   ),
                   if (cartState.items.isNotEmpty) ...[
                     const SizedBox(width: 8),
@@ -501,21 +556,21 @@ class _SalePageState extends ConsumerState<SalePage> {
                             width: 72,
                             height: 72,
                             decoration: BoxDecoration(
-                              color: kSurface,
+                              color: context.appSurface,
                               borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: kBorder, width: 0.9),
+                              border: Border.all(color: context.appBorder, width: 0.9),
                             ),
-                            child: const Icon(Icons.shopping_cart_outlined, color: kTextMuted, size: 32),
+                            child: Icon(Icons.shopping_cart_outlined, color: context.appTextMuted, size: 32),
                           ),
                           const SizedBox(height: 14),
-                          const Text(
+                          Text(
                             'Cart is empty',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kText),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: context.appText),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
+                          Text(
                             'Search or scan a product to add it',
-                            style: TextStyle(fontSize: 12, color: kTextSub),
+                            style: TextStyle(fontSize: 12, color: context.appTextSub),
                           ),
                         ],
                       ),
@@ -549,11 +604,13 @@ class _SalePageState extends ConsumerState<SalePage> {
     );
   }
 
-  Widget _productIconBox() => Container(
-        width: 44,
-        height: 44,
-        color: kSurface2,
-        child: const Icon(Icons.inventory_2_outlined, size: 20, color: kTextMuted),
+  Widget _productIconBox() => Builder(
+        builder: (context) => Container(
+          width: 44,
+          height: 44,
+          color: context.appSurface2,
+          child: Icon(Icons.inventory_2_outlined, size: 20, color: context.appTextMuted),
+        ),
       );
 }
 
@@ -592,11 +649,11 @@ class _CartRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: kSurface,
+          color: context.appSurface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kBorder, width: 0.9),
-          boxShadow: const [
-            BoxShadow(color: Color(0x060A2018), blurRadius: 8, offset: Offset(0, 2)),
+          border: Border.all(color: context.appBorder, width: 0.9),
+          boxShadow: [
+            BoxShadow(color: Theme.of(context).colorScheme.shadow.withAlpha(20), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Row(
@@ -612,15 +669,15 @@ class _CartRow extends StatelessWidget {
                       errorBuilder: (_, _, _) => Container(
                         width: 48,
                         height: 48,
-                        color: kSurface2,
-                        child: const Icon(Icons.inventory_2_outlined, size: 22, color: kTextMuted),
+                        color: context.appSurface2,
+                        child: Icon(Icons.inventory_2_outlined, size: 22, color: context.appTextMuted),
                       ),
                     )
                   : Container(
                       width: 48,
                       height: 48,
-                      color: kSurface2,
-                      child: const Icon(Icons.inventory_2_outlined, size: 22, color: kTextMuted),
+                      color: context.appSurface2,
+                      child: Icon(Icons.inventory_2_outlined, size: 22, color: context.appTextMuted),
                     ),
             ),
             const SizedBox(width: 12),
@@ -630,7 +687,7 @@ class _CartRow extends StatelessWidget {
                 children: [
                   Text(
                     item.product.name,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kText),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.appText),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -650,7 +707,7 @@ class _CartRow extends StatelessWidget {
                   child: Text(
                     '${item.quantity}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: kText),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: context.appText),
                   ),
                 ),
                 _stepBtn(icon: Icons.add_rounded, onTap: onAdd, color: kPrimary),
@@ -659,7 +716,7 @@ class _CartRow extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               formatKes(item.totalPrice),
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: kText),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: context.appText),
             ),
           ],
         ),
@@ -701,10 +758,10 @@ class _CheckoutBar extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).padding.bottom + 14),
       decoration: BoxDecoration(
-        color: kSurface,
-        border: Border(top: BorderSide(color: kBorder, width: 0.9)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0C0A2018), blurRadius: 18, offset: Offset(0, -4)),
+        color: context.appSurface,
+        border: Border(top: BorderSide(color: context.appBorder, width: 0.9)),
+        boxShadow: [
+          BoxShadow(color: Theme.of(context).colorScheme.shadow.withAlpha(24), blurRadius: 18, offset: const Offset(0, -4)),
         ],
       ),
       child: Row(
@@ -715,15 +772,15 @@ class _CheckoutBar extends StatelessWidget {
               children: [
                 Text(
                   '$itemCount item${itemCount != 1 ? 's' : ''}',
-                  style: const TextStyle(fontSize: 11, color: kTextSub, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 11, color: context.appTextSub, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   formatKes(total),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: kText,
+                    color: context.appText,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -759,7 +816,7 @@ class _CheckoutBar extends StatelessWidget {
                         end: Alignment.bottomRight,
                       )
                     : null,
-                color: itemCount > 0 ? null : kSurface2,
+                color: itemCount > 0 ? null : context.appSurface2,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: itemCount > 0
                     ? [BoxShadow(color: kPrimary.withAlpha(60), blurRadius: 12, offset: const Offset(0, 4))]
@@ -770,7 +827,7 @@ class _CheckoutBar extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.payment_rounded,
-                    color: itemCount > 0 ? Colors.white : kTextMuted,
+                    color: itemCount > 0 ? Colors.white : context.appTextMuted,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -779,7 +836,7 @@ class _CheckoutBar extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: itemCount > 0 ? Colors.white : kTextMuted,
+                      color: itemCount > 0 ? Colors.white : context.appTextMuted,
                     ),
                   ),
                 ],

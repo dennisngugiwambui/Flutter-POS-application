@@ -6,6 +6,7 @@ import '../../mpesa/mpesa_service.dart';
 import '../../products/presentation/product_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../../dashboard_provider.dart';
+import '../../../core/app_theme.dart';
 import '../../../core/money_format.dart';
 
 enum PaymentMethod { cash, stk }
@@ -19,7 +20,8 @@ class CheckoutPaymentPage extends ConsumerStatefulWidget {
   ConsumerState<CheckoutPaymentPage> createState() => _CheckoutPaymentPageState();
 }
 
-class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
+class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage>
+    with SingleTickerProviderStateMixin {
   PaymentMethod _paymentMethod = PaymentMethod.cash;
   final TextEditingController _amountReceivedController = TextEditingController();
   final TextEditingController _mpesaDigitsController = TextEditingController();
@@ -27,11 +29,22 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
   bool _isSubmitting = false;
   String? _changeError;
   String? _stkStatus;
+  late AnimationController _animCtrl;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _animCtrl.forward();
+  }
 
   @override
   void dispose() {
     _amountReceivedController.dispose();
     _mpesaDigitsController.dispose();
+    _animCtrl.dispose();
     super.dispose();
   }
 
@@ -70,17 +83,13 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
       setState(() => _changeError = 'Amount received must be at least ${formatKes(total)}');
       return;
     }
-    setState(() { _isSubmitting = true; _changeError = null; });
+    setState(() {
+      _isSubmitting = true;
+      _changeError = null;
+    });
     try {
       await ref.read(dashboardStatsRepositoryProvider).recordSale(widget.cartState.totalAmount, widget.cartState.items);
       ref.invalidate(dashboardStatsProvider);
-      final productRepo = ref.read(productRepositoryProvider);
-      for (final item in widget.cartState.items) {
-        final product = item.product;
-        if (product.id == null) continue;
-        final newStock = (product.stockQuantity - item.quantity).clamp(0, 1 << 31);
-        await productRepo.updateStock(product.id!, newStock);
-      }
       ref.invalidate(productsProvider);
       if (!mounted) return;
       final change = _change;
@@ -101,7 +110,11 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
       setState(() => _changeError = 'Enter valid phone (9 digits after +254)');
       return;
     }
-    setState(() { _isSubmitting = true; _changeError = null; _stkStatus = null; });
+    setState(() {
+      _isSubmitting = true;
+      _changeError = null;
+      _stkStatus = null;
+    });
     final phone = _fullMpesaPhone;
     try {
       final settings = await ref.read(settingsProvider.future);
@@ -128,15 +141,12 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
         return;
       }
 
-      await ref.read(dashboardStatsRepositoryProvider).recordSale(total, widget.cartState.items);
+      await ref.read(dashboardStatsRepositoryProvider).recordSale(
+            total,
+            widget.cartState.items,
+            paymentMethod: 'mpesa',
+          );
       ref.invalidate(dashboardStatsProvider);
-      final productRepo = ref.read(productRepositoryProvider);
-      for (final item in widget.cartState.items) {
-        final product = item.product;
-        if (product.id == null) continue;
-        final newStock = (product.stockQuantity - item.quantity).clamp(0, 1 << 31);
-        await productRepo.updateStock(product.id!, newStock);
-      }
       ref.invalidate(productsProvider);
       if (!mounted) return;
       final paidMsg = result.receiptNumber != null && result.receiptNumber!.isNotEmpty
@@ -153,228 +163,652 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage> {
     if (mounted) setState(() => _isSubmitting = false);
   }
 
+  List<double> _quickAmounts() {
+    final total = widget.cartState.totalAmount;
+    final base = (total / 100).ceil() * 100;
+    return [total, base, base + 100, base + 200, base + 500]
+        .toSet()
+        .where((a) => a >= total)
+        .take(5)
+        .toList()
+      ..sort();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final cs = theme.colorScheme;
     final total = widget.cartState.totalAmount;
     final itemCount = widget.cartState.items.fold<int>(0, (sum, i) => sum + i.quantity);
-    final itemCountLabel = itemCount == 1 ? '1 item' : '$itemCount items';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: colorScheme.onSurface),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Checkout', style: TextStyle(fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withAlpha(80),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: colorScheme.outline.withAlpha(80)),
-              ),
-              child: Column(
-                children: [
-                  Text('Total', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatKes(total),
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colorScheme.primary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(itemCountLabel, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text('Payment method', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _methodTile(PaymentMethod.cash, 'Cash', Icons.payments_rounded, colorScheme),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _methodTile(PaymentMethod.stk, 'M-Pesa STK', Icons.phone_android_rounded, colorScheme),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            if (_paymentMethod == PaymentMethod.cash) ..._buildCashSection(colorScheme),
-            if (_paymentMethod == PaymentMethod.stk) ..._buildStkSection(colorScheme),
-            if (_stkStatus != null && _paymentMethod == PaymentMethod.stk) ...[
-              const SizedBox(height: 8),
-              Text(_stkStatus!, style: TextStyle(color: colorScheme.primary, fontSize: 13, fontWeight: FontWeight.w600)),
-            ],
-            if (_changeError != null) ...[
-              const SizedBox(height: 8),
-              Text(_changeError!, style: TextStyle(color: colorScheme.error, fontSize: 13)),
-            ],
-            const SizedBox(height: 32),
-            SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _isSubmitting
-                    ? null
-                    : () async {
-                        if (_paymentMethod == PaymentMethod.cash) {
-                          await _submitCash();
-                        } else {
-                          await _submitStk();
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: _isSubmitting
-                    ? SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary))
-                    : Text(
-                        _paymentMethod == PaymentMethod.cash ? 'Complete sale' : 'Send STK push',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_rounded, color: cs.onSurface),
+                        onPressed: () => Navigator.pop(context),
                       ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Checkout',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: cs.onSurface,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1B8B5A), Color(0xFF26B573)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kPrimary.withAlpha(70),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        right: -20,
+                        top: -20,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withAlpha(15),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(22),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$itemCount item${itemCount != 1 ? 's' : ''}',
+                              style: TextStyle(
+                                color: Colors.white.withAlpha(200),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              formatKes(total),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -1,
+                                height: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Total due',
+                              style: TextStyle(
+                                color: Colors.white.withAlpha(170),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            ...widget.cartState.items.map(
+                              (item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 5),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${item.quantity}× ${item.product.name}',
+                                        style: TextStyle(
+                                          color: Colors.white.withAlpha(210),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Text(
+                                      formatKes(item.totalPrice),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Payment method',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: cs.onSurface,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _PaymentMethodCard(
+                            icon: Icons.payments_rounded,
+                            label: 'Cash',
+                            selected: _paymentMethod == PaymentMethod.cash,
+                            onTap: () => setState(() {
+                              _paymentMethod = PaymentMethod.cash;
+                              _changeError = null;
+                              _stkStatus = null;
+                            }),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _PaymentMethodCard(
+                            icon: Icons.phone_android_rounded,
+                            label: 'M-Pesa',
+                            selected: _paymentMethod == PaymentMethod.stk,
+                            onTap: () => setState(() {
+                              _paymentMethod = PaymentMethod.stk;
+                              _changeError = null;
+                              _stkStatus = null;
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_paymentMethod == PaymentMethod.cash)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Amount received',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _amountReceivedController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setState(() {}),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: cs.onSurface,
+                        ),
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                        decoration: InputDecoration(
+                          hintText: formatKes(total),
+                          hintStyle: TextStyle(color: cs.onSurfaceVariant.withAlpha(180), fontSize: 18),
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Text(
+                              'Ksh',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: cs.primary,
+                              ),
+                            ),
+                          ),
+                          prefixIconConstraints: const BoxConstraints(minWidth: 60, minHeight: 52),
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest.withAlpha(120),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: cs.outline.withAlpha(100)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: cs.outline.withAlpha(100)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: cs.primary, width: 1.5),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final amt in _quickAmounts())
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Builder(
+                                  builder: (ctx) {
+                                    final recv = _amountReceived;
+                                    final match = recv != null && (recv - amt).abs() < 0.01;
+                                    final fd = (amt % 1 == 0) ? 0 : 2;
+                                    return Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () {
+                                          _amountReceivedController.text = fd == 0 ? amt.toStringAsFixed(0) : amt.toStringAsFixed(2);
+                                          setState(() {});
+                                        },
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: match ? cs.primary : cs.surfaceContainerHighest,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: match ? cs.primary : cs.outline.withAlpha(100),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            formatKes(amt, fractionDigits: fd),
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: match ? Colors.white : cs.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (_amountReceived != null && _amountReceived! >= total) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: kPrimary.withAlpha(14),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: kPrimary.withAlpha(45)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: kPrimary.withAlpha(22),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.change_circle_rounded, color: kPrimary, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Change to give back',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: cs.onSurfaceVariant,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      formatKes(_change),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                        color: kPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (_amountReceived != null && _amountReceived! < total) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: kError.withAlpha(14),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: kError.withAlpha(45)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: kError, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Short by ${formatKes(total - _amountReceived!)}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: kError,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            if (_paymentMethod == PaymentMethod.stk)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Customer phone number',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHighest,
+                              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                              border: Border.all(color: cs.outline.withAlpha(100)),
+                            ),
+                            child: Text(
+                              _mpesaPrefix,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: cs.primary,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _mpesaDigitsController,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(() {}),
+                              maxLength: 9,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: cs.onSurface),
+                              decoration: InputDecoration(
+                                hintText: '7XXXXXXXX',
+                                counterText: '',
+                                filled: true,
+                                fillColor: cs.surfaceContainerHighest.withAlpha(120),
+                                border: OutlineInputBorder(
+                                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
+                                  borderSide: BorderSide(color: cs.outline.withAlpha(100)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
+                                  borderSide: BorderSide(color: cs.primary, width: 1.5),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: kPrimary.withAlpha(12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: kPrimary.withAlpha(38)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, color: kPrimary, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'STK push for ${formatKes(total)}. Ensure Shop Settings M-Pesa matches your live Daraja app (same as web).',
+                                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_stkStatus != null && _paymentMethod == PaymentMethod.stk)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                  child: Text(
+                    _stkStatus!,
+                    style: TextStyle(color: cs.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            if (_changeError != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                  child: Text(
+                    _changeError!,
+                    style: TextStyle(color: cs.error, fontSize: 13),
+                  ),
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
       ),
+      bottomNavigationBar: Material(
+        color: cs.surface,
+        child: Container(
+          padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.paddingOf(context).bottom + 14),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            border: Border(top: BorderSide(color: cs.outline.withAlpha(80))),
+            boxShadow: [
+              BoxShadow(
+                color: cs.shadow.withAlpha(24),
+                blurRadius: 18,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () async {
+                      if (_paymentMethod == PaymentMethod.cash) {
+                        await _submitCash();
+                      } else {
+                        await _submitStk();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                disabledBackgroundColor: kPrimary.withAlpha(120),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _paymentMethod == PaymentMethod.cash
+                              ? Icons.check_circle_rounded
+                              : Icons.send_to_mobile_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _paymentMethod == PaymentMethod.cash ? 'Complete sale' : 'Send M-Pesa request',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
+}
 
-  Widget _methodTile(PaymentMethod method, String label, IconData icon, ColorScheme colorScheme) {
-    final selected = _paymentMethod == method;
-    final fg = selected ? colorScheme.onPrimaryContainer : colorScheme.onSurface;
-    final muted = selected ? colorScheme.onPrimaryContainer.withAlpha(220) : colorScheme.onSurfaceVariant;
+class _PaymentMethodCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PaymentMethodCard({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => setState(() {
-          _paymentMethod = method;
-          _changeError = null;
-          _stkStatus = null;
-        }),
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
-            color: selected ? colorScheme.primaryContainer.withAlpha(220) : colorScheme.surfaceContainerHighest.withAlpha(200),
+            gradient: selected
+                ? const LinearGradient(
+                    colors: [Color(0xFF1B8B5A), Color(0xFF26B573)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: selected ? null : Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(160),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outline.withAlpha(70),
-              width: selected ? 2 : 1,
+              color: selected ? Colors.transparent : Theme.of(context).colorScheme.outline.withAlpha(100),
+              width: 0.9,
             ),
             boxShadow: selected
-                ? [BoxShadow(color: colorScheme.primary.withAlpha(45), blurRadius: 12, offset: const Offset(0, 4))]
-                : null,
+                ? [BoxShadow(color: kPrimary.withAlpha(55), blurRadius: 14, offset: const Offset(0, 5))]
+                : [
+                    BoxShadow(
+                      color: Theme.of(context).colorScheme.shadow.withAlpha(20),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 28, color: selected ? colorScheme.primary : muted),
-              const SizedBox(height: 10),
+              Icon(
+                icon,
+                color: selected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
+                size: 26,
+              ),
+              const SizedBox(height: 8),
               Text(
                 label,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.15, color: fg),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
+              if (selected) ...[
+                const SizedBox(height: 4),
+                Container(
+                  width: 20,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(160),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
-  }
-
-  List<Widget> _buildCashSection(ColorScheme colorScheme) {
-    return [
-      Text('Amount received', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: colorScheme.onSurfaceVariant)),
-      const SizedBox(height: 8),
-      TextField(
-        controller: _amountReceivedController,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onChanged: (_) => setState(() {}),
-        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
-        decoration: InputDecoration(
-          hintText: '0.00',
-          prefixText: 'Ksh ',
-          filled: true,
-          fillColor: colorScheme.surfaceContainerHighest,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
-      if (_amountReceived != null && _amountReceived! >= widget.cartState.totalAmount) ...[
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: colorScheme.tertiaryContainer.withAlpha(80),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Change to give', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14)),
-              Text(formatKes(_change), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.tertiary)),
-            ],
-          ),
-        ),
-      ],
-    ];
-  }
-
-  List<Widget> _buildStkSection(ColorScheme colorScheme) {
-    return [
-      Text('Customer phone (M-Pesa)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: colorScheme.onSurfaceVariant)),
-      const SizedBox(height: 8),
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.horizontal(left: Radius.zero, right: const Radius.circular(12)),
-              border: Border.all(color: colorScheme.outline.withAlpha(120)),
-            ),
-            child: Text(_mpesaPrefix, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
-          ),
-          Expanded(
-            child: TextField(
-              controller: _mpesaDigitsController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              maxLength: 9,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                hintText: '7XXXXXXXX',
-                counterText: '',
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.horizontal(left: Radius.zero, right: const Radius.circular(12)),
-                  borderSide: BorderSide(color: colorScheme.outline.withAlpha(120)),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 8),
-      Text('Enter last 9 digits. STK push will be sent to $_mpesaPrefix...', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
-    ];
   }
 }

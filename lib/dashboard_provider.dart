@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/domain/profile_model.dart';
 import 'features/auth/presentation/auth_provider.dart';
+import 'features/dashboard/data/broadcast_repository.dart';
 import 'features/dashboard/data/dashboard_stats_repository.dart';
+
+final broadcastRepositoryProvider = Provider<BroadcastRepository>((ref) => BroadcastRepository());
 
 final profileProvider = FutureProvider<ProfileModel?>((ref) async {
   final authRepository = ref.watch(authRepositoryProvider);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/theme_context.dart';
 import '../../../core/ui_components.dart';
 import '../../../core/money_format.dart';
 import '../../../dashboard_provider.dart';
@@ -16,7 +17,7 @@ class DashboardPage extends ConsumerWidget {
     final statsAsync = ref.watch(dashboardStatsProvider);
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: context.appBg,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
@@ -38,19 +39,19 @@ class DashboardPage extends ConsumerWidget {
                           children: [
                             Text(
                               'Good ${_greeting()},',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: kTextSub,
+                                color: context.appTextSub,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               p?.fullName.split(' ').first ?? 'there',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w900,
-                                color: kText,
+                                color: context.appText,
                                 letterSpacing: -0.8,
                                 height: 1.1,
                               ),
@@ -58,15 +59,15 @@ class DashboardPage extends ConsumerWidget {
                           ],
                         ),
                         loading: () => const SizedBox(height: 44),
-                        error: (_, __) => const Text(
+                        error: (_, __) => Text(
                           'Welcome!',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: kText),
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: context.appText),
                         ),
                       ),
                     ),
                     TopIconBtn(
                       icon: Icons.notifications_outlined,
-                      onTap: () => showNotificationsSheet(context),
+                      onTap: () => showNotificationsSheet(context, ref),
                     ),
                   ],
                 ),
@@ -153,7 +154,7 @@ class DashboardPage extends ConsumerWidget {
                     4,
                     (_) => Container(
                       decoration: BoxDecoration(
-                        color: kSurface,
+                        color: context.appSurface,
                         borderRadius: BorderRadius.circular(22),
                       ),
                       child: const Center(
@@ -231,14 +232,15 @@ class _RichStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kSurface,
+        color: context.appSurface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: kBorder, width: 0.9),
-        boxShadow: const [
-          BoxShadow(color: Color(0x080A2018), blurRadius: 16, offset: Offset(0, 5)),
+        border: Border.all(color: context.appBorder, width: 0.9),
+        boxShadow: [
+          BoxShadow(color: cs.shadow.withAlpha(20), blurRadius: 16, offset: const Offset(0, 5)),
         ],
       ),
       child: Column(
@@ -302,14 +304,14 @@ class _RichStatCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: kText,
+              color: context.appText,
             ),
           ),
           const SizedBox(height: 2),
-          Text(sub, style: const TextStyle(fontSize: 10, color: kTextMuted)),
+          Text(sub, style: TextStyle(fontSize: 10, color: context.appTextMuted)),
         ],
       ),
     );
@@ -493,58 +495,60 @@ class _QuickActionsGrid extends StatelessWidget {
   }
 
   Widget _buildCard(_QA a) {
-    return GestureDetector(
-      onTap: a.onTap,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: a.color.withAlpha(45), width: 0.9),
-          boxShadow: [
-            BoxShadow(color: a.color.withAlpha(15), blurRadius: 12, offset: const Offset(0, 4)),
-            const BoxShadow(color: Color(0x080A2018), blurRadius: 8, offset: Offset(0, 2)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: a.color.withAlpha(18),
-                borderRadius: BorderRadius.circular(12),
+    return Builder(
+      builder: (context) => GestureDetector(
+        onTap: a.onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          decoration: BoxDecoration(
+            color: context.appSurface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: a.color.withAlpha(45), width: 0.9),
+            boxShadow: [
+              BoxShadow(color: a.color.withAlpha(15), blurRadius: 12, offset: const Offset(0, 4)),
+              BoxShadow(color: Theme.of(context).colorScheme.shadow.withAlpha(20), blurRadius: 8, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: a.color.withAlpha(18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(a.icon, color: a.color, size: 20),
               ),
-              child: Icon(a.icon, color: a.color, size: 20),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  a.label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: kText,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Text(
-                      'Open',
-                      style: TextStyle(fontSize: 10, color: a.color, fontWeight: FontWeight.w700),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    a.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: context.appText,
+                      letterSpacing: -0.2,
                     ),
-                    const SizedBox(width: 2),
-                    Icon(Icons.arrow_forward_rounded, size: 10, color: a.color),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        'Open',
+                        style: TextStyle(fontSize: 10, color: a.color, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(Icons.arrow_forward_rounded, size: 10, color: a.color),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -575,21 +579,21 @@ class _RecentActivity extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: kSurface2,
+                    color: context.appSurface2,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(Icons.inbox_outlined, color: kTextMuted, size: 24),
+                  child: Icon(Icons.inbox_outlined, color: context.appTextMuted, size: 24),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'No recent activity',
-                  style: TextStyle(fontWeight: FontWeight.w700, color: kTextSub, fontSize: 14),
+                  style: TextStyle(fontWeight: FontWeight.w700, color: context.appTextSub, fontSize: 14),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Start making sales to see activity here',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: kTextMuted),
+                  style: TextStyle(fontSize: 12, color: context.appTextMuted),
                 ),
               ],
             ),
@@ -639,40 +643,42 @@ class _RecentActivity extends StatelessWidget {
     required String badge,
     required Color badgeColor,
   }) {
-    return AppCard(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: color.withAlpha(18),
-              borderRadius: BorderRadius.circular(13),
+    return Builder(
+      builder: (context) => AppCard(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withAlpha(18),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(icon, color: color, size: 20),
             ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: kText,
-                    letterSpacing: -0.2,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: context.appText,
+                      letterSpacing: -0.2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(sub, style: const TextStyle(fontSize: 11, color: kTextSub)),
-              ],
+                  const SizedBox(height: 2),
+                  Text(sub, style: TextStyle(fontSize: 11, color: context.appTextSub)),
+                ],
+              ),
             ),
-          ),
-          PillBadge(text: badge, color: badgeColor),
-        ],
+            PillBadge(text: badge, color: badgeColor),
+          ],
+        ),
       ),
     );
   }

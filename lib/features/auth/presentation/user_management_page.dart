@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/theme_context.dart';
 import '../../../core/ui_components.dart';
 import '../../../dashboard_provider.dart';
 import '../domain/profile_model.dart';
@@ -19,7 +21,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
   List<ProfileModel> _users = [];
   bool _loading = true;
   late TabController _tabs;
-  static const _tabsList = ['All', 'Admin', 'Manager', 'Cashier'];
+  static const _tabsList = ['All', 'Admin', 'Manager', 'Cashier', 'Client'];
 
   @override
   void initState() {
@@ -50,6 +52,9 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
   List<ProfileModel> _filtered(String tab) {
     if (tab == 'All') return _users;
     final r = tab.toLowerCase();
+    if (tab == 'Client') {
+      return _users.where((u) => u.role.toLowerCase() == 'client').toList();
+    }
     return _users.where((u) => u.role.toLowerCase() == r).toList();
   }
 
@@ -74,8 +79,42 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
 
   Future<void> _changeRole(ProfileModel user, String newRole) async {
     if (user.id == null) return;
-    await Supabase.instance.client.from('profiles').update({'role': newRole}).eq('id', user.id!);
-    _loadUsers();
+    try {
+      await Supabase.instance.client.rpc(
+        'staff_set_user_role',
+        params: {
+          'p_target_user_id': user.id!,
+          'p_new_role': newRole,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${user.fullName} is now ${newRole[0].toUpperCase()}${newRole.substring(1)}.'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kPrimary,
+        ),
+      );
+      await _loadUsers();
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kError,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kError,
+        ),
+      );
+    }
   }
 
   Future<bool?> _showConfirmModal({
@@ -90,10 +129,14 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
     return showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
+      builder: (ctx) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 30),
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(28)),
+        decoration: BoxDecoration(
+          color: ctx.appSurface,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: ctx.appBorder, width: 0.9),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -104,9 +147,9 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
               child: Icon(icon, color: iconColor, size: 26),
             ),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText)),
+            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ctx.appText)),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: kTextSub)),
+            Text(message, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: ctx.appTextSub)),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -151,7 +194,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
           .where((u) => u.role.toLowerCase() == 'cashier' && u.isActive != false)
           .toList();
       return Scaffold(
-        backgroundColor: kBg,
+        backgroundColor: context.appBg,
         body: _loading
             ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary))
             : CustomScrollView(
@@ -168,13 +211,13 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                               children: [
                                 TopIconBtn(icon: Icons.arrow_back_rounded, onTap: () => Navigator.pop(context)),
                                 const SizedBox(width: 14),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     'Active cashiers',
                                     style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w900,
-                                      color: kText,
+                                      color: context.appText,
                                       letterSpacing: -0.5,
                                     ),
                                   ),
@@ -183,9 +226,9 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                               ],
                             ),
                             const SizedBox(height: 10),
-                            const Text(
+                            Text(
                               'You can see fellow cashiers who are active. Status changes are managed by a manager or admin.',
-                              style: TextStyle(fontSize: 13, color: kTextSub, height: 1.35),
+                              style: TextStyle(fontSize: 13, color: context.appTextSub, height: 1.35),
                             ),
                             const SizedBox(height: 14),
                             AppCard(
@@ -196,10 +239,10 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                                   const SizedBox(width: 12),
                                   Text(
                                     '${peers.length} active',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w900,
-                                      color: kText,
+                                      color: context.appText,
                                     ),
                                   ),
                                 ],
@@ -211,12 +254,12 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                     ),
                   ),
                   if (peers.isEmpty)
-                    const SliverFillRemaining(
+                    SliverFillRemaining(
                       hasScrollBody: false,
                       child: Center(
                         child: Text(
                           'No active cashiers listed',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextSub),
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.appTextSub),
                         ),
                       ),
                     )
@@ -239,7 +282,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
     }
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: context.appBg,
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           SliverToBoxAdapter(
@@ -253,13 +296,13 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                       children: [
                         TopIconBtn(icon: Icons.arrow_back_rounded, onTap: () => Navigator.pop(context)),
                         const SizedBox(width: 14),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'User Management',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
-                              color: kText,
+                              color: context.appText,
                               letterSpacing: -0.5,
                             ),
                           ),
@@ -272,25 +315,37 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: AppCard(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          _summaryCol('Total', '${_users.length}', kPrimary),
-                          _vertDiv(),
-                          _summaryCol('Admins', '${_users.where((u) => u.role.toLowerCase() == 'admin').length}', kWarning),
-                          _vertDiv(),
-                          _summaryCol(
-                            'Managers',
-                            '${_users.where((u) => u.role.toLowerCase() == 'manager').length}',
-                            kAccent,
-                          ),
-                          _vertDiv(),
-                          _summaryCol(
-                            'Cashiers',
-                            '${_users.where((u) => u.role.toLowerCase() == 'cashier').length}',
-                            kInfo,
-                          ),
-                        ],
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _summaryCol(context, 'Total', '${_users.length}', kPrimary),
+                            _vertDiv(),
+                            _summaryCol(context, 'Admins', '${_users.where((u) => u.role.toLowerCase() == 'admin').length}', kWarning),
+                            _vertDiv(),
+                            _summaryCol(
+                              context,
+                              'Managers',
+                              '${_users.where((u) => u.role.toLowerCase() == 'manager').length}',
+                              kAccent,
+                            ),
+                            _vertDiv(),
+                            _summaryCol(
+                              context,
+                              'Cashiers',
+                              '${_users.where((u) => u.role.toLowerCase() == 'cashier').length}',
+                              kInfo,
+                            ),
+                            _vertDiv(),
+                            _summaryCol(
+                              context,
+                              'Clients',
+                              '${_users.where((u) => u.role.toLowerCase() == 'client').length}',
+                              kGold,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -300,14 +355,16 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                     child: Container(
                       height: 44,
                       decoration: BoxDecoration(
-                        color: kSurface,
+                        color: context.appSurface,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: kBorder, width: 0.9),
+                        border: Border.all(color: context.appBorder, width: 0.9),
                       ),
                       child: TabBar(
                         controller: _tabs,
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
                         labelColor: Colors.white,
-                        unselectedLabelColor: kTextSub,
+                        unselectedLabelColor: context.appTextSub,
                         labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                         unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                         indicator: BoxDecoration(
@@ -353,7 +410,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                           const SizedBox(height: 14),
                           Text(
                             tab == 'All' ? 'No users yet' : 'No ${tab}s yet',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextSub),
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.appTextSub),
                           ),
                         ],
                       ),
@@ -368,6 +425,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                         user: list[i],
                         onToggle: () => _toggleActive(list[i]),
                         onRoleChanged: (r) => _changeRole(list[i], r),
+                        onShowDetails: () => _showUserDetailSheet(context, list[i]),
                       ),
                     ),
                   );
@@ -412,31 +470,124 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
     );
   }
 
-  Widget _summaryCol(String label, String value, Color color) => Expanded(
+  Widget _summaryCol(BuildContext context, String label, String value, Color color) => SizedBox(
+        width: 76,
         child: Column(
           children: [
             Text(
               value,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color, letterSpacing: -0.5),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: color, letterSpacing: -0.5),
             ),
             const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(fontSize: 10, color: kTextSub, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: context.appTextSub, fontWeight: FontWeight.w600),
             ),
           ],
         ),
       );
 
-  Widget _vertDiv() => Container(width: 0.9, height: 32, color: kBorder);
+  Widget _vertDiv() => Builder(
+        builder: (context) => Container(width: 0.9, height: 32, color: context.appBorder),
+      );
+
+  void _showUserDetailSheet(BuildContext context, ProfileModel user) {
+    final cs = Theme.of(context).colorScheme;
+    final df = DateFormat('MMM d, y • HH:mm');
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: ctx.appSurface,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: ctx.appBorder, width: 0.9),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'User details',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: cs.onSurface),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: Icon(Icons.close_rounded, color: cs.onSurfaceVariant),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(user.fullName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: cs.onSurface)),
+            const SizedBox(height: 6),
+            _detailRow(ctx, Icons.email_outlined, user.email),
+            if (user.phoneNumber.isNotEmpty) _detailRow(ctx, Icons.phone_outlined, user.phoneNumber),
+            const SizedBox(height: 12),
+            _detailRow(
+              ctx,
+              Icons.badge_outlined,
+              'Role: ${user.role.isEmpty ? '—' : '${user.role[0].toUpperCase()}${user.role.substring(1)}'}',
+            ),
+            _detailRow(
+              ctx,
+              user.isActive != false ? Icons.check_circle_outline_rounded : Icons.block_rounded,
+              user.isActive != false ? 'Active' : 'Inactive',
+            ),
+            if (user.createdAt != null) _detailRow(ctx, Icons.event_outlined, df.format(user.createdAt!.toLocal())),
+            const SizedBox(height: 8),
+            Text(
+              'Tip: tap the role pill to change role, or use the switch to activate/deactivate.',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.35),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(BuildContext context, IconData icon, String text) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: cs.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: TextStyle(fontSize: 14, color: cs.onSurface, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _showAddEmployee(BuildContext context) async {
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: kSurface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => const CreateEmployeeSheet(),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Align(
+        alignment: Alignment.bottomCenter,
+        child: FractionallySizedBox(
+          heightFactor: 0.92,
+          child: Material(
+            color: Theme.of(ctx).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            clipBehavior: Clip.antiAlias,
+            child: const CreateEmployeeSheet(),
+          ),
+        ),
+      ),
     );
     if (!context.mounted) return;
     if (created == true) {
@@ -492,12 +643,12 @@ class _CashierPeerCard extends StatelessWidget {
               children: [
                 Text(
                   user.fullName,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kText),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: context.appText),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   user.email,
-                  style: const TextStyle(fontSize: 11, color: kTextSub),
+                  style: TextStyle(fontSize: 11, color: context.appTextSub),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -515,15 +666,23 @@ class _UserCard extends StatelessWidget {
   final ProfileModel user;
   final VoidCallback onToggle;
   final ValueChanged<String> onRoleChanged;
+  final VoidCallback onShowDetails;
 
-  const _UserCard({required this.user, required this.onToggle, required this.onRoleChanged});
+  const _UserCard({
+    required this.user,
+    required this.onToggle,
+    required this.onRoleChanged,
+    required this.onShowDetails,
+  });
 
-  Color get _roleColor {
+  Color _roleColor(BuildContext context) {
     switch (user.role.toLowerCase()) {
       case 'admin':
         return kWarning;
       case 'manager':
         return kAccent;
+      case 'client':
+        return kInfo;
       default:
         return kPrimary;
     }
@@ -535,6 +694,8 @@ class _UserCard extends StatelessWidget {
         return Icons.admin_panel_settings_rounded;
       case 'manager':
         return Icons.manage_accounts_rounded;
+      case 'client':
+        return Icons.storefront_rounded;
       default:
         return Icons.point_of_sale_rounded;
     }
@@ -542,6 +703,8 @@ class _UserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final roleColor = _roleColor(context);
     final isActive = user.isActive != false;
     final parts = user.fullName.split(' ').where((w) => w.isNotEmpty).toList();
     final initials = parts.length >= 2
@@ -553,91 +716,108 @@ class _UserCard extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.all(14),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: _roleColor, width: 2),
-              color: _roleColor.withAlpha(18),
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: _roleColor,
+          Expanded(
+            child: InkWell(
+              onTap: onShowDetails,
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 4, bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: roleColor, width: 2),
+                        color: roleColor.withAlpha(18),
+                      ),
+                      child: Center(
+                        child: Text(
+                          initials,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: roleColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.fullName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: context.appText,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            user.email,
+                            style: TextStyle(fontSize: 11, color: context.appTextSub),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _showRoleSheet(context),
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: roleColor.withAlpha(15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: roleColor.withAlpha(55), width: 0.9),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(_roleIcon, size: 11, color: roleColor),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        user.role.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: roleColor,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Icon(Icons.expand_more_rounded, size: 12, color: roleColor),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              PillBadge(
+                                text: isActive ? 'ACTIVE' : 'INACTIVE',
+                                color: isActive ? kPrimary : kError,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.fullName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: kText,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  user.email,
-                  style: const TextStyle(fontSize: 11, color: kTextSub),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => _showRoleSheet(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _roleColor.withAlpha(15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _roleColor.withAlpha(55), width: 0.9),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_roleIcon, size: 11, color: _roleColor),
-                            const SizedBox(width: 4),
-                            Text(
-                              user.role.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: _roleColor,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const SizedBox(width: 3),
-                            Icon(Icons.expand_more_rounded, size: 12, color: _roleColor),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    PillBadge(
-                      text: isActive ? 'ACTIVE' : 'INACTIVE',
-                      color: isActive ? kPrimary : kError,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 6),
           GestureDetector(
             onTap: onToggle,
+            behavior: HitTestBehavior.opaque,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 46,
@@ -648,9 +828,9 @@ class _UserCard extends StatelessWidget {
                         colors: [Color(0xFF1B8B5A), Color(0xFF26B573)],
                       )
                     : null,
-                color: isActive ? null : kSurface2,
+                color: isActive ? null : context.appSurface2,
                 borderRadius: BorderRadius.circular(13),
-                border: isActive ? null : Border.all(color: kBorder, width: 0.9),
+                border: isActive ? null : Border.all(color: context.appBorder, width: 0.9),
               ),
               child: AnimatedAlign(
                 duration: const Duration(milliseconds: 200),
@@ -660,7 +840,7 @@ class _UserCard extends StatelessWidget {
                   height: 20,
                   margin: const EdgeInsets.symmetric(horizontal: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cs.surface,
                     shape: BoxShape.circle,
                     boxShadow: [BoxShadow(color: Colors.black.withAlpha(25), blurRadius: 3)],
                   ),
@@ -674,79 +854,87 @@ class _UserCard extends StatelessWidget {
   }
 
   void _showRoleSheet(BuildContext context) {
+    final surface = context.appSurface;
+    final surface2 = context.appSurface2;
+    final border = context.appBorder;
+    final textMain = context.appText;
+    final textSub = context.appTextSub;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
+      builder: (ctx) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 30),
         padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(28)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Change Role',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: kText),
-            ),
-            const SizedBox(height: 16),
-            for (final entry in [
-              ('admin', Icons.admin_panel_settings_rounded, kWarning, 'Full system access'),
-              ('manager', Icons.manage_accounts_rounded, kAccent, 'Manage staff & reports'),
-              ('cashier', Icons.point_of_sale_rounded, kPrimary, 'Process sales only'),
-            ])
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                    onRoleChanged(entry.$1);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: user.role == entry.$1 ? entry.$3.withAlpha(12) : kSurface2,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: user.role == entry.$1 ? entry.$3.withAlpha(55) : kBorder,
-                        width: 0.9,
+        decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(28)),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Change Role',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: textMain),
+              ),
+              const SizedBox(height: 16),
+              for (final entry in [
+                ('admin', Icons.admin_panel_settings_rounded, kWarning, 'Full system access'),
+                ('manager', Icons.manage_accounts_rounded, kAccent, 'Manage staff & reports'),
+                ('cashier', Icons.point_of_sale_rounded, kPrimary, 'Process sales only'),
+                ('client', Icons.storefront_rounded, kInfo, 'Customer / shop account'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      onRoleChanged(entry.$1);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: user.role == entry.$1 ? entry.$3.withAlpha(12) : surface2,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: user.role == entry.$1 ? entry.$3.withAlpha(55) : border,
+                          width: 0.9,
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: user.role == entry.$1 ? entry.$3.withAlpha(20) : kSurface,
-                            borderRadius: BorderRadius.circular(12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: user.role == entry.$1 ? entry.$3.withAlpha(20) : surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(entry.$2, color: user.role == entry.$1 ? entry.$3 : textSub, size: 20),
                           ),
-                          child: Icon(entry.$2, color: user.role == entry.$1 ? entry.$3 : kTextSub, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.$1[0].toUpperCase() + entry.$1.substring(1),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: user.role == entry.$1 ? entry.$3 : kText,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.$1[0].toUpperCase() + entry.$1.substring(1),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: user.role == entry.$1 ? entry.$3 : textMain,
+                                  ),
                                 ),
-                              ),
-                              Text(entry.$4, style: const TextStyle(fontSize: 11, color: kTextSub)),
-                            ],
+                                Text(entry.$4, style: TextStyle(fontSize: 11, color: textSub)),
+                              ],
+                            ),
                           ),
-                        ),
-                        if (user.role == entry.$1) Icon(Icons.check_circle_rounded, color: entry.$3, size: 20),
-                      ],
+                          if (user.role == entry.$1) Icon(Icons.check_circle_rounded, color: entry.$3, size: 20),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

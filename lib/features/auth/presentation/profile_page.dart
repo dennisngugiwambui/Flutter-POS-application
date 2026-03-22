@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/app_theme.dart';
+import '../../../core/theme_context.dart';
 import '../../../core/role_guard.dart';
 import '../../../core/ui_components.dart';
 import '../../../dashboard_provider.dart';
@@ -45,7 +46,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
     final profileAsync = ref.watch(profileProvider);
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: context.appBg,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -66,7 +67,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _sectionLabel('ACCOUNT'),
+                                _sectionLabel(context, 'ACCOUNT'),
                                 _MenuCard(
                                   items: [
                                     MenuRow(
@@ -86,7 +87,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _sectionLabel('ACCOUNT'),
+                              _sectionLabel(context, 'ACCOUNT'),
                               _MenuCard(
                                 items: [
                                   MenuRow(
@@ -100,7 +101,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                                       MaterialPageRoute(builder: (_) => const SalesHistoryPage()),
                                     ),
                                   ),
-                                  Divider(height: 1, color: kBorder.withAlpha(160), indent: 54),
+                                  Divider(height: 1, color: context.appBorder.withAlpha(160), indent: 54),
                                   MenuRow(
                                     icon: Icons.tune_rounded,
                                     label: 'Shop Settings',
@@ -119,7 +120,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _sectionLabel('ADMINISTRATION'),
+                                    _sectionLabel(context, 'ADMINISTRATION'),
                                     _MenuCard(
                                       items: [
                                         MenuRow(
@@ -147,7 +148,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _sectionLabel('TEAM'),
+                                    _sectionLabel(context, 'TEAM'),
                                     _MenuCard(
                                       items: [
                                         MenuRow(
@@ -177,7 +178,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                         orElse: () => Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _sectionLabel('ACCOUNT'),
+                            _sectionLabel(context, 'ACCOUNT'),
                             _MenuCard(
                               items: [
                                 MenuRow(
@@ -191,7 +192,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                                     MaterialPageRoute(builder: (_) => const SalesHistoryPage()),
                                   ),
                                 ),
-                                Divider(height: 1, color: kBorder.withAlpha(160), indent: 54),
+                                Divider(height: 1, color: context.appBorder.withAlpha(160), indent: 54),
                                 MenuRow(
                                   icon: Icons.tune_rounded,
                                   label: 'Shop Settings',
@@ -209,7 +210,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                           ],
                         ),
                       ),
-                      _sectionLabel('APP'),
+                      _sectionLabel(context, 'APP'),
                       _MenuCard(
                         items: [
                           MenuRow(
@@ -220,7 +221,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
                             iconBg: kInfo.withAlpha(15),
                             onTap: () {},
                           ),
-                          Divider(height: 1, color: kBorder.withAlpha(160), indent: 54),
+                          Divider(height: 1, color: context.appBorder.withAlpha(160), indent: 54),
                           MenuRow(
                             icon: Icons.info_outline_rounded,
                             label: 'About POS',
@@ -255,14 +256,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
     );
   }
 
-  static Widget _sectionLabel(String text) => Padding(
+  static Widget _sectionLabel(BuildContext context, String text) => Padding(
         padding: const EdgeInsets.only(left: 4, bottom: 8),
         child: Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w800,
-            color: kTextMuted,
+            color: context.appTextMuted,
             letterSpacing: 0.9,
           ),
         ),
@@ -272,12 +273,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
     final ok = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
+      builder: (ctx) => Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 30),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: kSurface,
+          color: ctx.appSurface,
           borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: ctx.appBorder, width: 0.9),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -292,15 +294,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
               child: const Icon(Icons.logout_rounded, color: kError, size: 24),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Sign Out?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kText),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ctx.appText),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'You will need to sign in again to access your POS.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: kTextSub),
+              style: TextStyle(fontSize: 14, color: ctx.appTextSub),
             ),
             const SizedBox(height: 24),
             Row(
@@ -563,11 +565,11 @@ class _MenuCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: kSurface,
+        color: context.appSurface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kBorder, width: 0.9),
-        boxShadow: const [
-          BoxShadow(color: Color(0x080A2018), blurRadius: 12, offset: Offset(0, 4)),
+        border: Border.all(color: context.appBorder, width: 0.9),
+        boxShadow: [
+          BoxShadow(color: Theme.of(context).colorScheme.shadow.withAlpha(24), blurRadius: 12, offset: const Offset(0, 4)),
         ],
       ),
       child: Padding(

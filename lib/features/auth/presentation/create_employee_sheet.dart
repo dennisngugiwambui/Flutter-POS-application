@@ -105,15 +105,12 @@ class _CreateEmployeeSheetState extends ConsumerState<CreateEmployeeSheet> {
     final colorScheme = theme.colorScheme;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
-    // Own Scaffold so SnackBars show above the sheet content (modal route issue).
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      resizeToAvoidBottomInset: true,
-      body: Padding(
-        padding: EdgeInsets.only(bottom: bottom),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
+    // Sheet is shown inside a rounded [Material] from the caller — no full-screen [Scaffold].
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Form(
@@ -255,7 +252,6 @@ class _CreateEmployeeSheetState extends ConsumerState<CreateEmployeeSheet> {
             ),
           ),
         ),
-      ),
     );
   }
 
