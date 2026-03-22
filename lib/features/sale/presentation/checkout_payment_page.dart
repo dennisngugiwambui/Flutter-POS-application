@@ -8,6 +8,7 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../../dashboard_provider.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/money_format.dart';
+import '../../../core/user_friendly_errors.dart';
 
 enum PaymentMethod { cash, stk }
 
@@ -134,7 +135,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage>
       if (!mounted) return;
       if (!result.success) {
         setState(() {
-          _changeError = result.errorMessage ?? result.message;
+          _changeError = userFriendlyMpesaError(result.errorMessage ?? result.message);
           _stkStatus = null;
           _isSubmitting = false;
         });
@@ -156,7 +157,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _changeError = 'M-Pesa request failed: $e';
+        _changeError = userFriendlyAuthOrNetworkError(e);
         _stkStatus = null;
       });
     }
@@ -621,7 +622,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage>
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'STK for ${formatKes(total)}. In Shop Settings: Consumer Key/Secret + Passkey must be from the same Daraja app as your Shortcode/Till. Turn Sandbox ON if you use test credentials; OFF for production. "Merchant does not exist" usually means sandbox/live mismatch or wrong passkey for that shortcode.',
+                                'M-Pesa STK for ${formatKes(total)}. Use Paybill in Shortcode, Till in Till Number, and the Lipa Na M-Pesa passkey for that Paybill. Same sandbox/live mode as Daraja.',
                                 style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
                               ),
                             ),

@@ -5,6 +5,7 @@ import 'auth_provider.dart';
 import 'register_page.dart';
 import '../../dashboard/presentation/shell_router.dart';
 import '../../../dashboard_provider.dart';
+import '../../../core/user_friendly_errors.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -112,9 +113,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with TickerProviderStateM
       }
     } catch (e) {
       _shakeCtrl.forward(from: 0);
-      String msg = e.toString();
-      if (msg.contains('Invalid login credentials')) msg = 'Incorrect email or password.';
-      else if (msg.contains('Email not confirmed')) msg = 'Please confirm your email first.';
+      final msg = userFriendlyAuthOrNetworkError(e);
       if (mounted) _showError(msg);
     } finally {
       if (mounted) setState(() => _loading = false);

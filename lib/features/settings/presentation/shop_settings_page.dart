@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../dashboard_provider.dart';
+import '../../dashboard/presentation/main_shell.dart';
 import '../domain/shop_settings_model.dart';
 import 'settings_provider.dart';
 
@@ -170,6 +171,18 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          tooltip: 'Menu',
+          onPressed: () => MainShell.shellScaffoldKey.currentState?.openDrawer(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Home',
+            onPressed: () => ref.read(mainShellTabProvider.notifier).state = 0,
+          ),
+        ],
         title: Text('Shop Settings', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
       ),
       body: SingleChildScrollView(
@@ -288,10 +301,10 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
                  Text('M-Pesa (Daraja API)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                  const SizedBox(height: 6),
                  Text(
-                   'STK Password uses Shortcode + Passkey from the same Daraja app as Consumer Key/Secret. '
-                   'Buy Goods: put Paybill in Shortcode and store Till in Till Number. '
-                   'Passkey is the Lipa Na M-Pesa Online key for that shortcode—not C2B keys. '
-                   'Turn Sandbox off for production.',
+                   'STK password uses Paybill (Shortcode) + Passkey from Lipa Na M-Pesa Online for that org. '
+                   'Buy Goods: Shortcode = Paybill, Till Number = store till. '
+                   'Callback URL must match what you register in Daraja; for in-app payment status use your Supabase …/functions/v1/mpesa-callback. '
+                   'Sandbox off for production.',
                    style: TextStyle(fontSize: 12, height: 1.35, color: colorScheme.onSurfaceVariant),
                  ),
                  const SizedBox(height: 12),

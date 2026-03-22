@@ -6,6 +6,7 @@ import '../../../core/theme_context.dart';
 import '../../../core/role_guard.dart';
 import '../../../core/ui_components.dart';
 import '../../../dashboard_provider.dart';
+import '../../dashboard/presentation/main_shell.dart';
 import '../../sale/presentation/sales_history_page.dart';
 import '../../settings/presentation/shop_settings_page.dart';
 import 'auth_provider.dart';
@@ -50,7 +51,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _FullHero(profileAsync: profileAsync, fadeAnim: _fadeAnim, slideAnim: _slideAnim),
+            _FullHero(
+              profileAsync: profileAsync,
+              fadeAnim: _fadeAnim,
+              slideAnim: _slideAnim,
+            ),
             FadeTransition(
               opacity: _fadeAnim,
               child: SlideTransition(
@@ -336,7 +341,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> with SingleTickerProv
   }
 }
 
-class _FullHero extends StatelessWidget {
+class _FullHero extends ConsumerWidget {
   final AsyncValue<dynamic> profileAsync;
   final Animation<double> fadeAnim;
   final Animation<Offset> slideAnim;
@@ -348,7 +353,7 @@ class _FullHero extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -390,6 +395,20 @@ class _FullHero extends StatelessWidget {
                     children: [
                       Row(
                         children: [
+                          TopIconBtn(
+                            icon: Icons.menu_rounded,
+                            bg: Colors.white.withAlpha(36),
+                            iconColor: Colors.white,
+                            onTap: () => MainShell.shellScaffoldKey.currentState?.openDrawer(),
+                          ),
+                          const SizedBox(width: 8),
+                          TopIconBtn(
+                            icon: Icons.home_rounded,
+                            bg: Colors.white.withAlpha(36),
+                            iconColor: Colors.white,
+                            onTap: () => ref.read(mainShellTabProvider.notifier).state = 0,
+                          ),
+                          const SizedBox(width: 8),
                           const Text(
                             'Profile',
                             style: TextStyle(
@@ -502,8 +521,10 @@ class _FullHero extends StatelessWidget {
                                 const SizedBox(width: 10),
                                 _heroPill(
                                   label: 'Status',
-                                  value: 'ACTIVE',
-                                  valueColor: const Color(0xFF4DFFA0),
+                                  value: (profile?.isActive != false) ? 'ACTIVE' : 'INACTIVE',
+                                  valueColor: (profile?.isActive != false)
+                                      ? const Color(0xFF4DFFA0)
+                                      : Colors.white.withAlpha(200),
                                 ),
                               ],
                             ),

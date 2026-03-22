@@ -110,8 +110,32 @@ Deno.serve(async (req) => {
       });
     }
 
+    const newId = created.user?.id;
+    if (newId) {
+      // Ensure profiles.role matches the chosen role (trigger may not mirror user_metadata reliably).
+      const { error: syncErr } = await adminClient.from("profiles").upsert(
+        {
+          id: newId,
+          email,
+          full_name: fullName,
+          phone_number: phoneNumber,
+          role,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" },
+      );
+      if (syncErr) {
+        console.error("profiles sync after createUser:", syncErr);
+        return new Response(JSON.stringify({ error: syncErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, user_id: created.user?.id ?? null }),
+      JSON.stringify({ success: true, user_id: newId ?? null }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {

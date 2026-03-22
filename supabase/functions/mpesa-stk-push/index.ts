@@ -187,17 +187,20 @@ Deno.serve(async (req) => {
     const shortcodeRaw = String(config.mpesa_shortcode || "").trim();
     const tillRaw = String(config.mpesa_till_number || "").trim();
 
-    // STK Password = Base64(BusinessShortCode + Passkey + Timestamp). Daraja validates this against the same identifiers used in PartyB for your transaction type.
-    // CustomerBuyGoodsOnline: use Till for both password (BusinessShortCode field) and PartyB when till is set — avoids paybill/till mismatch "Merchant does not exist".
-    // CustomerPayBillOnline: Paybill (shortcode) for both.
+    // STK Password = Base64(BusinessShortCode + Passkey + Timestamp).
+    // Daraja / Lipa Na M-Pesa Online: the passkey is issued for the organization **BusinessShortCode** (usually Paybill).
+    // CustomerBuyGoodsOnline: BusinessShortCode = Paybill (shortcode), PartyB = Till — standard Daraja behaviour.
+    // Using Till in the password while Paybill is registered in Daraja causes "Merchant does not exist".
     let businessShortCode: string;
     let partyB: string;
     const isPayBill = transactionType === "CustomerPayBillOnline";
     if (isPayBill) {
       businessShortCode = shortcodeRaw || tillRaw;
       partyB = businessShortCode;
+    } else if (shortcodeRaw && tillRaw) {
+      businessShortCode = shortcodeRaw;
+      partyB = tillRaw;
     } else {
-      // Buy Goods: prefer Till for BusinessShortCode + PartyB so password matches receiver.
       businessShortCode = tillRaw || shortcodeRaw;
       partyB = businessShortCode;
     }

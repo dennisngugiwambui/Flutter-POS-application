@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dashboard_provider.dart';
+import '../../../core/user_friendly_errors.dart';
 import 'auth_provider.dart';
 import 'login_page.dart';
 
@@ -168,14 +169,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       );
     } catch (e) {
       _shakeCtrl.forward(from: 0);
-      var msg = e.toString();
-      if (msg.contains('already registered') || msg.contains('already exists')) {
+      var msg = userFriendlyAuthOrNetworkError(e);
+      final raw = e.toString();
+      if (raw.contains('already registered') || raw.contains('already exists')) {
         msg = 'This email is already registered.';
-      } else if (msg.contains('weak password') || msg.contains('Password')) {
+      } else if (raw.contains('weak password') || raw.contains('Password')) {
         msg = 'Password is too weak. Use at least 6 characters.';
-      } else if (msg.contains('invalid email')) {
+      } else if (raw.contains('invalid email')) {
         msg = 'Please enter a valid email address.';
-      } else if (msg.contains('PGRST') || msg.contains('check_registration')) {
+      } else if (raw.contains('PGRST') || raw.contains('check_registration')) {
         msg = 'Server setup: apply Supabase migration check_registration_available.sql, then try again.';
       }
       _showToast(msg, error: true);

@@ -3,7 +3,7 @@ REM Pixel POS - Build Android APK + AAB, replace files in "final app" (run from 
 cd /d "%~dp0\.."
 
 set BUILD_NAME=1.0.3
-set BUILD_NUMBER=6
+set BUILD_NUMBER=7
 
 echo Cleaning and fetching...
 call flutter clean

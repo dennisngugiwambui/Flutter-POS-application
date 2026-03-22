@@ -27,6 +27,9 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
   void initState() {
     super.initState();
     _tabs = TabController(length: _tabsList.length, vsync: this);
+    _tabs.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadUsers();
   }
 
@@ -73,8 +76,39 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
       confirmColor: newVal ? kPrimary : kError,
     );
     if (ok != true) return;
-    await Supabase.instance.client.from('profiles').update({'is_active': newVal}).eq('id', user.id!);
-    _loadUsers();
+    try {
+      final res = await Supabase.instance.client.from('profiles').update({'is_active': newVal}).eq('id', user.id!).select();
+      if (res.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not update status (no permission or user missing).'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: kError,
+          ),
+        );
+        return;
+      }
+      await _loadUsers();
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kError,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update status: $e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: kError,
+        ),
+      );
+    }
   }
 
   Future<void> _changeRole(ProfileModel user, String newRole) async {
@@ -432,7 +466,7 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
                 }).toList(),
               ),
       ),
-      floatingActionButton: isStaff
+      floatingActionButton: isStaff && _tabs.index == 0
           ? Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [Color(0xFF1B8B5A), Color(0xFF26B573)]),

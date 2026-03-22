@@ -108,15 +108,23 @@ class _CreateEmployeeSheetState extends ConsumerState<CreateEmployeeSheet>
 
   @override
   Widget build(BuildContext context) {
-    final isManagerOnly = ref.watch(profileProvider).maybeWhen(
+    final profileAsync = ref.watch(profileProvider);
+    final isManagerOnly = profileAsync.maybeWhen(
       data: (p) => p?.role.toLowerCase() == 'manager',
       orElse: () => false,
     );
     final roleOptions = isManagerOnly ? ['cashier'] : ['cashier', 'manager', 'admin'];
-    if (!roleOptions.contains(_role)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _role = 'cashier');
-      });
+    // Only clamp role once profile is known — while loading, keep full options so admin selections aren't reset to cashier.
+    final profile = profileAsync.maybeWhen(data: (p) => p, orElse: () => null);
+    if (profile != null) {
+      final opts = profile.role.toLowerCase() == 'manager'
+          ? ['cashier']
+          : ['cashier', 'manager', 'admin'];
+      if (!opts.contains(_role)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _role = 'cashier');
+        });
+      }
     }
 
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;

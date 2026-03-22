@@ -3,8 +3,9 @@ Pixel POS – deliverables from this Windows build (2026-03-22)
 
 Android
 -------
-  Pixel_POS_android_1.0.3_build6.apk  — release APK from `flutter build apk --release`
-  Matches pubspec: version 1.0.3+6
+  Pixel_POS_android_1.0.3_build7.apk  — release APK from `flutter build apk --release`
+  Pixel_POS_android_1.0.3_build7.aab  — Play Store bundle from `flutter build appbundle --release`
+  Matches pubspec: version 1.0.3+7
 
 iOS (.ipa)
 ----------
