@@ -59,8 +59,9 @@ class ReceiptPage extends ConsumerWidget {
               if (logoBytes != null)
                 pw.Center(
                   child: pw.Container(
-                    height: 40,
-                    margin: const pw.EdgeInsets.only(bottom: 4),
+                    height: 56,
+                    width: 200,
+                    margin: const pw.EdgeInsets.only(bottom: 8),
                     child: pw.Image(pw.MemoryImage(logoBytes), fit: pw.BoxFit.contain),
                   ),
                 ),
@@ -82,23 +83,33 @@ class ReceiptPage extends ConsumerWidget {
               pw.Text('Date: ${dateFormat.format(now)}', style: const pw.TextStyle(fontSize: 9)),
               pw.SizedBox(height: 4),
               pw.Divider(),
-              ...items.map((dynamic item) {
+              ...items.asMap().entries.map((entry) {
+                final n = entry.key + 1;
+                final dynamic item = entry.value;
                 final name = item.product.name as String;
                 final int qty = item.quantity as int;
                 final double price = (item.product.sellingPrice as num).toDouble();
                 final double lineTotal = (item.totalPrice as num).toDouble();
                 return pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                  child: pw.Column(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 3),
+                  child: pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(name, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text('$qty x ${formatKes(price)}', style: pw.TextStyle(fontSize: 9)),
-                          pw.Text(formatKes(lineTotal), style: pw.TextStyle(fontSize: 9)),
-                        ],
+                      pw.SizedBox(width: 22, child: pw.Text('$n.', style: const pw.TextStyle(fontSize: 9))),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(name, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                            pw.Row(
+                              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                              children: [
+                                pw.Text('$qty × ${formatKes(price)}', style: pw.TextStyle(fontSize: 9)),
+                                pw.Text(formatKes(lineTotal), style: pw.TextStyle(fontSize: 9)),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -182,7 +193,10 @@ class ReceiptPage extends ConsumerWidget {
                           if (shopSettings.logoUrl.isNotEmpty)
                             Image.network(
                               shopSettings.logoUrl,
-                              height: 50,
+                              height: 88,
+                              width: 200,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
                               errorBuilder: (c, e, s) => const SizedBox(),
                             )
                           else
@@ -222,24 +236,36 @@ class ReceiptPage extends ConsumerWidget {
                       ],
                     ),
                     const Divider(height: 32, thickness: 1, color: Colors.black12),
-                    // Items List
-                    ...items.map((item) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                                Text('${item.quantity} x ${formatKes(item.product.sellingPrice)}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
-                              ],
+                    // Items List (numbered)
+                    ...items.asMap().entries.map((entry) {
+                      final n = entry.key + 1;
+                      final item = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 28,
+                              child: Text(
+                                '$n.',
+                                style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black54, fontSize: 14),
+                              ),
                             ),
-                          ),
-                          Text(formatKes(item.totalPrice), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                        ],
-                      ),
-                    )),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.product.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                                  Text('${item.quantity} × ${formatKes(item.product.sellingPrice)}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            Text(formatKes(item.totalPrice), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                          ],
+                        ),
+                      );
+                    }),
                     const Divider(height: 32, thickness: 1, color: Colors.black12),
                     // Total
                     Row(

@@ -621,7 +621,7 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage>
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'STK push for ${formatKes(total)}. Ensure Shop Settings M-Pesa matches your live Daraja app (same as web).',
+                                'STK for ${formatKes(total)}. In Shop Settings: Consumer Key/Secret + Passkey must be from the same Daraja app as your Shortcode/Till. Turn Sandbox ON if you use test credentials; OFF for production. "Merchant does not exist" usually means sandbox/live mismatch or wrong passkey for that shortcode.',
                                 style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4),
                               ),
                             ),

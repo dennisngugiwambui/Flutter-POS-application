@@ -1,0 +1,18 @@
+Pixel POS – deliverables from this Windows build (2026-03-22)
+===============================================================
+
+Android
+-------
+  Pixel_POS_android_1.0.3_build6.apk  — release APK from `flutter build apk --release`
+  Matches pubspec: version 1.0.3+6
+
+iOS (.ipa)
+----------
+  Not included in this folder from this machine.
+
+  This PC’s Flutter SDK only exposes `flutter build apk` (no `flutter build ipa`).
+  Producing an IPA requires macOS, Xcode, and signing — see iOS_BUILD_NOTE.txt and
+  final app/build_ios.sh on a Mac.
+
+  After building on a Mac, copy the IPA here as:
+    Pixel_POS_ios_1.0.3_build6.ipa

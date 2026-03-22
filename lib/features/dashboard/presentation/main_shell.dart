@@ -41,6 +41,9 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
     final tab = ref.watch(mainShellTabProvider);
+    final theme = Theme.of(context);
+    final brightness = theme.brightness;
+    final cs = theme.colorScheme;
 
     return PopScope(
       canPop: false,
@@ -72,10 +75,12 @@ class _MainShellState extends ConsumerState<MainShell> {
         );
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.dark.copyWith(
+        value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          systemNavigationBarColor: kSurface,
-          systemNavigationBarIconBrightness: Brightness.dark,
+          statusBarIconBrightness: brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+          systemNavigationBarColor: cs.surface,
+          systemNavigationBarIconBrightness:
+              brightness == Brightness.dark ? Brightness.light : Brightness.dark,
         ),
         child: Scaffold(
           key: MainShell.shellScaffoldKey,
@@ -88,6 +93,8 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
           body: IndexedStack(index: tab, children: _pages),
           bottomNavigationBar: _BottomNav(
+            colorScheme: cs,
+            brightness: brightness,
             current: tab,
             onTap: (i) => ref.read(mainShellTabProvider.notifier).state = i,
           ),
@@ -272,22 +279,30 @@ class _DrawerTile extends StatelessWidget {
 
 // ── Bottom navigation bar ──────────────────────────────────────────────────────
 class _BottomNav extends StatelessWidget {
+  final ColorScheme colorScheme;
+  final Brightness brightness;
   final int current;
   final ValueChanged<int> onTap;
 
-  const _BottomNav({required this.current, required this.onTap});
+  const _BottomNav({
+    required this.colorScheme,
+    required this.brightness,
+    required this.current,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final cs = colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: kSurface,
-        border: Border(top: BorderSide(color: kBorder, width: 0.9)),
-        boxShadow: const [
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outline, width: 0.9)),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0C0A2018),
+            color: cs.shadow.withAlpha(brightness == Brightness.dark ? 80 : 12),
             blurRadius: 18,
-            offset: Offset(0, -4),
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -297,8 +312,22 @@ class _BottomNav extends StatelessWidget {
           height: 62,
           child: Row(
             children: [
-              _NavItem(icon: Icons.home_rounded, label: 'Home', idx: 0, cur: current, onTap: onTap),
-              _NavItem(icon: Icons.inventory_2_rounded, label: 'Products', idx: 1, cur: current, onTap: onTap),
+              _NavItem(
+                colorScheme: cs,
+                icon: Icons.home_rounded,
+                label: 'Home',
+                idx: 0,
+                cur: current,
+                onTap: onTap,
+              ),
+              _NavItem(
+                colorScheme: cs,
+                icon: Icons.inventory_2_rounded,
+                label: 'Products',
+                idx: 1,
+                cur: current,
+                onTap: onTap,
+              ),
 
               // Centre POS button
               Expanded(
@@ -317,7 +346,7 @@ class _BottomNav extends StatelessWidget {
                         borderRadius: BorderRadius.circular(17),
                         boxShadow: [
                           BoxShadow(
-                            color: kPrimary.withAlpha(75),
+                            color: cs.primary.withAlpha(75),
                             blurRadius: 14,
                             offset: const Offset(0, 4),
                           ),
@@ -333,8 +362,22 @@ class _BottomNav extends StatelessWidget {
                 ),
               ),
 
-              _NavItem(icon: Icons.person_rounded, label: 'Profile', idx: 3, cur: current, onTap: onTap),
-              _NavItem(icon: Icons.tune_rounded, label: 'More', idx: 4, cur: current, onTap: onTap),
+              _NavItem(
+                colorScheme: cs,
+                icon: Icons.person_rounded,
+                label: 'Profile',
+                idx: 3,
+                cur: current,
+                onTap: onTap,
+              ),
+              _NavItem(
+                colorScheme: cs,
+                icon: Icons.tune_rounded,
+                label: 'More',
+                idx: 4,
+                cur: current,
+                onTap: onTap,
+              ),
             ],
           ),
         ),
@@ -344,6 +387,7 @@ class _BottomNav extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
+  final ColorScheme colorScheme;
   final IconData icon;
   final String label;
   final int idx;
@@ -351,6 +395,7 @@ class _NavItem extends StatelessWidget {
   final ValueChanged<int> onTap;
 
   const _NavItem({
+    required this.colorScheme,
     required this.icon,
     required this.label,
     required this.idx,
@@ -361,6 +406,9 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = idx == cur;
+    final cs = colorScheme;
+    final primary = cs.primary;
+    final muted = cs.onSurfaceVariant;
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -373,10 +421,10 @@ class _NavItem extends StatelessWidget {
               width: 38,
               height: 34,
               decoration: BoxDecoration(
-                color: active ? kPrimary.withAlpha(18) : Colors.transparent,
+                color: active ? primary.withAlpha(28) : Colors.transparent,
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(icon, size: 20, color: active ? kPrimary : kTextMuted),
+              child: Icon(icon, size: 20, color: active ? primary : muted),
             ),
             const SizedBox(height: 2),
             Text(
@@ -384,7 +432,7 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? kPrimary : kTextMuted,
+                color: active ? primary : muted,
               ),
             ),
           ],

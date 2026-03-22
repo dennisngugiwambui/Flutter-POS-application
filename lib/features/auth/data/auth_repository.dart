@@ -12,17 +12,26 @@ class AuthRepository {
     required String email,
     required String phone,
   }) async {
-    final raw = await _supabase.rpc(
-      'check_registration_available',
-      params: {'p_email': email.trim(), 'p_phone': phone.trim()},
-    );
-    if (raw is Map) {
-      return (
-        emailTaken: raw['email_taken'] == true,
-        phoneTaken: raw['phone_taken'] == true,
+    try {
+      final raw = await _supabase.rpc(
+        'check_registration_available',
+        params: {'p_email': email.trim(), 'p_phone': phone.trim()},
       );
+      if (raw is Map) {
+        return (
+          emailTaken: raw['email_taken'] == true,
+          phoneTaken: raw['phone_taken'] == true,
+        );
+      }
+      throw Exception('Could not verify email and phone availability.');
+    } on PostgrestException catch (e) {
+      // Remote DB missing migration — RPC not in schema (PGRST202). Allow signup; Supabase Auth still enforces email uniqueness.
+      if (e.code == 'PGRST202' ||
+          (e.message.contains('check_registration_available'))) {
+        return (emailTaken: false, phoneTaken: false);
+      }
+      rethrow;
     }
-    throw Exception('Could not verify email and phone availability.');
   }
 
   /// True when at least one profile has role `admin` (shop already has an owner).

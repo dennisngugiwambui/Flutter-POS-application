@@ -93,6 +93,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     final settings = await ref.read(settingsProvider.future);
     final profile = await ref.read(profileProvider.future);
     final generatorName = profile?.fullName ?? Supabase.instance.client.auth.currentUser?.email ?? 'System';
+    final repo = ref.read(salesRepositoryProvider);
+    final saleIds = _sales.map((s) => s.id).toList();
+    final itemsBySale = await repo.getSaleItemsForSaleIds(saleIds);
 
     Uint8List? logoBytes;
     if (settings.logoUrl.isNotEmpty) {
@@ -108,6 +111,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     final periodText = 'Period: ${_startDate != null ? DateFormat('yyyy-MM-dd').format(_startDate!) : 'Any'} - ${_endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : 'Any'}';
     final isThermal = settings.printerType == 'thermal';
     final pageFormat = isThermal ? const PdfPageFormat(227, 800, marginAll: 12) : PdfPageFormat.a4;
+    final logoH = isThermal ? 56.0 : 100.0;
+    final logoW = isThermal ? 180.0 : 220.0;
 
     doc.addPage(
       pw.MultiPage(
@@ -125,8 +130,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           if (logoBytes != null)
             pw.Center(
               child: pw.Container(
-                height: 50,
-                margin: const pw.EdgeInsets.only(bottom: 12),
+                height: logoH,
+                width: logoW,
+                margin: const pw.EdgeInsets.only(bottom: 14),
                 child: pw.Image(pw.MemoryImage(logoBytes), fit: pw.BoxFit.contain),
               ),
             ),
@@ -161,60 +167,76 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               ],
             ),
           ),
-          pw.SizedBox(height: 8),
+          pw.SizedBox(height: 10),
           pw.Text('Sales Report', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
           pw.Text(periodText, style: const pw.TextStyle(fontSize: 10)),
-          pw.SizedBox(height: 16),
-          pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
-            columnWidths: const {
-              0: pw.FlexColumnWidth(2),
-              1: pw.FlexColumnWidth(2),
-              2: pw.FlexColumnWidth(1.2),
-            },
-            children: [
-              pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Products sold (by transaction)',
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800),
+          ),
+          pw.SizedBox(height: 8),
+          for (final sale in _sales) ...[
+            pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey400, width: 0.5),
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text('Date', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    '${dateFormat.format(sale.createdAt)} • ${sale.sellerName ?? '-'} • ${formatKes(sale.totalAmount)}',
+                    style: pw.TextStyle(
+                      fontSize: isThermal ? 9.5 : 10.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text('Seller', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  ),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.all(6),
-                    child: pw.Text('Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  ),
+                  pw.SizedBox(height: 6),
+                  ...(() {
+                    final lines = itemsBySale[sale.id] ?? [];
+                    if (lines.isEmpty) {
+                      return [
+                        pw.Text(
+                          '— No line items',
+                          style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic, color: PdfColors.grey600),
+                        ),
+                      ];
+                    }
+                    return List<pw.Widget>.generate(lines.length, (i) {
+                      final line = lines[i];
+                      final n = i + 1;
+                      return pw.Padding(
+                        padding: const pw.EdgeInsets.only(top: 4),
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.SizedBox(
+                              width: 24,
+                              child: pw.Text('$n.', style: const pw.TextStyle(fontSize: 9.5)),
+                            ),
+                            pw.Expanded(
+                              child: pw.Text(line.productName, style: const pw.TextStyle(fontSize: 10)),
+                            ),
+                            pw.Text('${line.quantity}×', style: const pw.TextStyle(fontSize: 9)),
+                            pw.SizedBox(width: 6),
+                            pw.Text(formatKes(line.totalPrice), style: const pw.TextStyle(fontSize: 9.5)),
+                          ],
+                        ),
+                      );
+                    });
+                  })(),
                 ],
               ),
-              ..._sales.map(
-                (s) => pw.TableRow(
-                  children: [
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(dateFormat.format(s.createdAt), style: const pw.TextStyle(fontSize: 10)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(s.sellerName ?? '-', style: const pw.TextStyle(fontSize: 10)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(formatKes(s.totalAmount), style: const pw.TextStyle(fontSize: 10)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          pw.SizedBox(height: 12),
+            ),
+            pw.SizedBox(height: 10),
+          ],
+          pw.SizedBox(height: 4),
           pw.Align(
             alignment: pw.Alignment.centerRight,
             child: pw.Text(
-              'Total: ${formatKes(total)}',
+              'Grand total: ${formatKes(total)}',
               style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
             ),
           ),

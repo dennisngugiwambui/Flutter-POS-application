@@ -287,7 +287,13 @@ class _ShopSettingsPageState extends ConsumerState<ShopSettingsPage> {
                  const SizedBox(height: 24),
                  Text('M-Pesa (Daraja API)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                  const SizedBox(height: 6),
-                 Text('Configure for STK Push. Use Callback URL from Supabase Edge Function.', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                 Text(
+                   'STK Password uses Shortcode + Passkey from the same Daraja app as Consumer Key/Secret. '
+                   'Buy Goods: put Paybill in Shortcode and store Till in Till Number. '
+                   'Passkey is the Lipa Na M-Pesa Online key for that shortcode—not C2B keys. '
+                   'Turn Sandbox off for production.',
+                   style: TextStyle(fontSize: 12, height: 1.35, color: colorScheme.onSurfaceVariant),
+                 ),
                  const SizedBox(height: 12),
                  _buildTextField('Consumer Key', _mpesaConsumerKeyController, Icons.vpn_key_rounded, colorScheme, optional: true),
                  const SizedBox(height: 12),

@@ -147,4 +147,21 @@ class SalesRepository {
     final list = response as List;
     return list.map((row) => SaleItemModel.fromJson(Map<String, dynamic>.from(row))).toList();
   }
+
+  /// Line items for many sales (e.g. PDF export), grouped by [sale_id].
+  Future<Map<String, List<SaleItemModel>>> getSaleItemsForSaleIds(List<String> saleIds) async {
+    if (saleIds.isEmpty) return {};
+    final response = await _supabase
+        .from('sale_items')
+        .select()
+        .inFilter('sale_id', saleIds)
+        .order('created_at', ascending: true);
+    final list = response as List;
+    final map = <String, List<SaleItemModel>>{};
+    for (final row in list) {
+      final item = SaleItemModel.fromJson(Map<String, dynamic>.from(row));
+      map.putIfAbsent(item.saleId, () => []).add(item);
+    }
+    return map;
+  }
 }

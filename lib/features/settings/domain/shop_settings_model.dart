@@ -1,3 +1,10 @@
+bool _parseBool(dynamic v) {
+  if (v == true) return true;
+  if (v == false || v == null) return false;
+  final s = v.toString().trim().toLowerCase();
+  return s == 'true' || s == '1' || s == 'yes';
+}
+
 class ShopSettingsModel {
   final String shopName;
   final String logoUrl;
@@ -54,7 +61,7 @@ class ShopSettingsModel {
       mpesaConfirmationUrl: json['mpesa_confirmation_url']?.toString() ?? '',
       mpesaValidationUrl: json['mpesa_validation_url']?.toString() ?? '',
       mpesaTransactionType: json['mpesa_transaction_type']?.toString() ?? 'CustomerBuyGoodsOnline',
-      mpesaIsSandbox: json['mpesa_is_sandbox'] == true,
+      mpesaIsSandbox: _parseBool(json['mpesa_is_sandbox']),
       printerType: json['printer_type']?.toString() ?? 'standard',
     );
   }

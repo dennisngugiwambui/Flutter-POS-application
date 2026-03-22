@@ -45,8 +45,18 @@ class SettingsRepository {
       return seeded;
     }
 
-    // Merge existing row with defaults so the form is always prefilled.
+    // Merge existing row with defaults so the form is prefilled.
+    //
+    // Important: if the user entered **live** Consumer Key/Secret but left passkey/shortcode empty,
+    // we must NOT inject demo passkey/shortcode/till — that mix causes OAuth to work while STK fails
+    // with "Merchant does not exist" (wrong Password = Base64(shortcode+passkey+time)).
     final base = ShopSettingsModel.fromJson(response);
+
+    final anyMpesaFieldSet = base.mpesaConsumerKey.trim().isNotEmpty ||
+        base.mpesaConsumerSecret.trim().isNotEmpty ||
+        base.mpesaPasskey.trim().isNotEmpty ||
+        base.mpesaShortcode.trim().isNotEmpty ||
+        base.mpesaTillNumber.trim().isNotEmpty;
 
     final merged = ShopSettingsModel(
       shopName: base.shopName,
@@ -54,11 +64,21 @@ class SettingsRepository {
       poBox: base.poBox,
       address: base.address,
       phoneNumber: base.phoneNumber,
-      mpesaShortcode: base.mpesaShortcode.isNotEmpty ? base.mpesaShortcode : _defaultShortcode,
-      mpesaPasskey: base.mpesaPasskey.isNotEmpty ? base.mpesaPasskey : _defaultPasskey,
-      mpesaConsumerKey: base.mpesaConsumerKey.isNotEmpty ? base.mpesaConsumerKey : _defaultConsumerKey,
-      mpesaConsumerSecret: base.mpesaConsumerSecret.isNotEmpty ? base.mpesaConsumerSecret : _defaultConsumerSecret,
-      mpesaTillNumber: base.mpesaTillNumber.isNotEmpty ? base.mpesaTillNumber : _defaultTillNumber,
+      mpesaShortcode: base.mpesaShortcode.isNotEmpty
+          ? base.mpesaShortcode
+          : (anyMpesaFieldSet ? '' : _defaultShortcode),
+      mpesaPasskey: base.mpesaPasskey.isNotEmpty
+          ? base.mpesaPasskey
+          : (anyMpesaFieldSet ? '' : _defaultPasskey),
+      mpesaConsumerKey: base.mpesaConsumerKey.isNotEmpty
+          ? base.mpesaConsumerKey
+          : (anyMpesaFieldSet ? '' : _defaultConsumerKey),
+      mpesaConsumerSecret: base.mpesaConsumerSecret.isNotEmpty
+          ? base.mpesaConsumerSecret
+          : (anyMpesaFieldSet ? '' : _defaultConsumerSecret),
+      mpesaTillNumber: base.mpesaTillNumber.isNotEmpty
+          ? base.mpesaTillNumber
+          : (anyMpesaFieldSet ? '' : _defaultTillNumber),
       mpesaBaseUrl: base.mpesaBaseUrl.isNotEmpty ? base.mpesaBaseUrl : _defaultBaseUrl,
       mpesaCallbackUrl: base.mpesaCallbackUrl.isNotEmpty
           ? base.mpesaCallbackUrl

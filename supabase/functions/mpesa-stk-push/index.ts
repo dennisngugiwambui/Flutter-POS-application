@@ -55,11 +55,24 @@ function mergeMpesaConfig(
   return out;
 }
 
+/** Postgres/JSON sometimes returns booleans as strings; Daraja sandbox flag must be a real boolean. */
+function normalizeSandboxFlag(config: Record<string, unknown>): void {
+  const v = config.mpesa_is_sandbox;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    config.mpesa_is_sandbox = s === "true" || s === "1" || s === "yes";
+  }
+}
+
 function envOr(key: string, fallback: string): string {
   return (Deno.env.get(key) ?? "").trim() || fallback;
 }
 
-/** Fallback Daraja credentials when DB + client are empty (keep in sync with Dart settings_repository). */
+/**
+ * Bundled demo credentials — only used when OAuth keys are also missing.
+ * NEVER fill shortcode/passkey/till from defaults when the user already set Consumer Key/Secret:
+ * OAuth would succeed with live keys but STK Password would use the wrong shortcode+passkey → "Merchant does not exist".
+ */
 function applyFallbackDefaults(config: Record<string, unknown>): Record<string, unknown> {
   const c = { ...config };
   const fk = envOr("MPESA_CONSUMER_KEY", "4aEia8VMAGLQU28ZoorLQRZtMutc6A6GyGXMq9HYoNFyXNOY");
@@ -68,11 +81,19 @@ function applyFallbackDefaults(config: Record<string, unknown>): Record<string, 
   const fsc = envOr("MPESA_SHORTCODE", "3560959");
   const ftill = envOr("MPESA_TILL_NUMBER", "6509715");
   const fcb = envOr("MPESA_CALLBACK_URL", "");
-  if (!(String(c.mpesa_consumer_key ?? "").trim())) c.mpesa_consumer_key = fk;
-  if (!(String(c.mpesa_consumer_secret ?? "").trim())) c.mpesa_consumer_secret = fs;
-  if (!(String(c.mpesa_passkey ?? "").trim())) c.mpesa_passkey = fp;
-  if (!(String(c.mpesa_shortcode ?? "").trim())) c.mpesa_shortcode = fsc;
-  if (!(String(c.mpesa_till_number ?? "").trim())) c.mpesa_till_number = ftill;
+
+  const hasKey = String(c.mpesa_consumer_key ?? "").trim() !== "";
+  const hasSecret = String(c.mpesa_consumer_secret ?? "").trim() !== "";
+  const useBundledDemo = !hasKey && !hasSecret;
+
+  if (useBundledDemo) {
+    if (!(String(c.mpesa_consumer_key ?? "").trim())) c.mpesa_consumer_key = fk;
+    if (!(String(c.mpesa_consumer_secret ?? "").trim())) c.mpesa_consumer_secret = fs;
+    if (!(String(c.mpesa_passkey ?? "").trim())) c.mpesa_passkey = fp;
+    if (!(String(c.mpesa_shortcode ?? "").trim())) c.mpesa_shortcode = fsc;
+    if (!(String(c.mpesa_till_number ?? "").trim())) c.mpesa_till_number = ftill;
+  }
+
   if (!(String(c.mpesa_callback_url ?? "").trim())) {
     if (fcb) c.mpesa_callback_url = fcb;
     else {
@@ -145,6 +166,7 @@ Deno.serve(async (req) => {
       clientMpesa,
     );
     config = applyFallbackDefaults(config);
+    normalizeSandboxFlag(config);
 
     if (configError && !dbRow) {
       console.warn("shop_configs read:", configError);
@@ -165,16 +187,17 @@ Deno.serve(async (req) => {
     const shortcodeRaw = String(config.mpesa_shortcode || "").trim();
     const tillRaw = String(config.mpesa_till_number || "").trim();
 
+    // STK Password = Base64(BusinessShortCode + Passkey + Timestamp). Daraja validates this against the same identifiers used in PartyB for your transaction type.
+    // CustomerBuyGoodsOnline: use Till for both password (BusinessShortCode field) and PartyB when till is set — avoids paybill/till mismatch "Merchant does not exist".
+    // CustomerPayBillOnline: Paybill (shortcode) for both.
     let businessShortCode: string;
     let partyB: string;
     const isPayBill = transactionType === "CustomerPayBillOnline";
     if (isPayBill) {
       businessShortCode = shortcodeRaw || tillRaw;
       partyB = businessShortCode;
-    } else if (shortcodeRaw && tillRaw) {
-      businessShortCode = shortcodeRaw;
-      partyB = tillRaw;
     } else {
+      // Buy Goods: prefer Till for BusinessShortCode + PartyB so password matches receiver.
       businessShortCode = tillRaw || shortcodeRaw;
       partyB = businessShortCode;
     }
@@ -268,7 +291,7 @@ Deno.serve(async (req) => {
           detail: stkData,
           hint:
             msg.includes("Merchant") || msg.includes("500.001.1001")
-              ? "Check: (1) Consumer Key/Secret match this environment (sandbox vs production). (2) Passkey + shortcode pair from Daraja (same app). (3) Buy Goods: Paybill in Shortcode, Till in Till Number. (4) Callback URL reachable by Safaricom."
+              ? "Check: (1) Sandbox vs production keys. (2) Passkey from Lipa Na M-Pesa Online for this shortcode/till. (3) Buy Goods: put Till in Till Number (password uses Till when set). (4) Callback URL reachable."
               : undefined,
         }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -304,7 +327,7 @@ Deno.serve(async (req) => {
           responseCode: stkData.ResponseCode,
           checkoutRequestId: stkData.CheckoutRequestID || null,
           hint: merchantErr
-            ? "Merchant/shortcode mismatch: use same Paybill + Passkey from Daraja; for Buy Goods set Shortcode=Paybill and Till Number=Store till."
+            ? "Merchant/shortcode mismatch: for Buy Goods ensure Till Number matches Daraja; passkey must be for the same Lipa Na M-Pesa credentials as Consumer Key."
             : undefined,
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },

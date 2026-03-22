@@ -2,6 +2,8 @@
 
 This folder holds **release deliverables** for Pixel POS (Android APK/AAB; iOS IPA when built on a Mac).
 
+**Latest Windows-packaged APK:** `Pixel_POS_android_1.0.3_build6.apk` (2026-03-22). See `WINDOWS_BUILD_2026-03-22.txt` for iOS.
+
 ## Current release (UI refresh + shop kit)
 
 | File | Description |
