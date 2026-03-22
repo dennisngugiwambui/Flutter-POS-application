@@ -6,9 +6,9 @@ This folder holds **release deliverables** for Pixel POS (Android APK/AAB; iOS I
 
 | File | Description |
 |------|-------------|
-| **Pixel_POS_android_1.0.3_build4.apk** | Android release APK – sideload / internal testing |
-| **Pixel_POS_android_1.0.3_build4.aab** | Google Play App Bundle |
-| **Pixel_POS_ios_1.0.3_build4.ipa** | iOS – **build on macOS** (see `iOS_BUILD_NOTE.txt`) |
+| **Pixel_POS_android_1.0.3_build6.apk** | Android release APK – sideload / internal testing |
+| **Pixel_POS_android_1.0.3_build4.aab** | Google Play App Bundle (rebuild with `build_android.bat` if needed) |
+| **Pixel_POS_ios_1.0.3_build6.ipa** | iOS – **build on macOS** (see `iOS_BUILD_NOTE.txt`; not produced on Windows) |
 
 > If those files are missing, run **`build_android.bat`** (Windows) or **`build_to_final_app.ps1`** from the project root, or on a Mac **`bash "final app/build_ios.sh"`**.
 
@@ -24,7 +24,7 @@ This folder holds **release deliverables** for Pixel POS (Android APK/AAB; iOS I
 
 ## Version
 
-- **1.0.3** (build **4**) – matches `pubspec.yaml` `version: 1.0.3+4`
+- **1.0.3** (build **6**) – matches `pubspec.yaml` `version: 1.0.3+6`
 - **App display name:** Pixel POS
 
 ## iOS note

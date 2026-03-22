@@ -165,13 +165,9 @@ class _CheckoutPaymentPageState extends ConsumerState<CheckoutPaymentPage>
 
   List<double> _quickAmounts() {
     final total = widget.cartState.totalAmount;
-    final base = (total / 100).ceil() * 100;
-    return [total, base, base + 100, base + 200, base + 500]
-        .toSet()
-        .where((a) => a >= total)
-        .take(5)
-        .toList()
-      ..sort();
+    final base = (total / 100).ceil() * 100.0;
+    final amounts = <double>{total, base, base + 100, base + 200, base + 500};
+    return amounts.where((a) => a >= total).take(5).toList()..sort();
   }
 
   @override

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shop/components/product/product_card.dart';
 import '../../../core/role_guard.dart';
+import '../../../dashboard_provider.dart';
 import 'product_provider.dart';
 import '../domain/product_model.dart';
 import 'product_detail_page.dart';

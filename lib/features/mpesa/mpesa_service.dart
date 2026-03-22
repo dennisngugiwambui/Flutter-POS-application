@@ -77,6 +77,7 @@ class MpesaService {
       amount: amount,
       phone: normalized,
       reference: ref.isEmpty ? 'POS' : ref,
+      mpesaConfig: settings.toJson(),
       onStatusUpdate: onStatusUpdate,
     );
 

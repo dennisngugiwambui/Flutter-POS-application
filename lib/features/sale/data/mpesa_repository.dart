@@ -24,10 +24,15 @@ class MpesaRepository {
   static const int _maxPollAttempts = 45; // ~90 seconds
 
   /// Invoke Edge Function to send STK push, then poll [mpesa_callback_results] for outcome.
+  ///
+  /// [mpesaConfig] — merged shop M-Pesa fields from the app (must match what the user saved in
+  /// Shop Settings). The Edge Function uses this on top of DB so STK always uses the same
+  /// credentials as the running app (fixes "Merchant does not exist" when DB was empty/stale).
   Future<MpesaStkResult> initiateStkPush({
     required double amount,
     required String phone,
     String reference = 'POS',
+    Map<String, dynamic>? mpesaConfig,
     void Function(String message)? onStatusUpdate,
   }) async {
     try {
@@ -38,6 +43,7 @@ class MpesaRepository {
           'amount': amount,
           'phone': phone.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^0'), '254'),
           'reference': reference,
+          if (mpesaConfig != null && mpesaConfig.isNotEmpty) 'mpesa_config': mpesaConfig,
         },
       );
 

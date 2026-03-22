@@ -42,11 +42,15 @@ class DashboardStatsRepository {
   }
 
   /// Records a sale and its line items (for sales history detail).
-  Future<void> recordSale(double totalAmount, List<CartItemModel> items) async {
+  Future<void> recordSale(
+    double totalAmount,
+    List<CartItemModel> items, {
+    String paymentMethod = 'cash',
+  }) async {
     await _salesRepo.recordSale(
       totalAmount: totalAmount,
       items: items,
-      paymentMethod: 'cash',
+      paymentMethod: paymentMethod,
     );
   }
 }

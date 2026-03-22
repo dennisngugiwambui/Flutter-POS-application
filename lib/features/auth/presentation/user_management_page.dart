@@ -576,29 +576,32 @@ class _UserManagementPageState extends ConsumerState<UserManagementPage>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Align(
-        alignment: Alignment.bottomCenter,
-        child: FractionallySizedBox(
-          heightFactor: 0.92,
-          child: Material(
-            color: Theme.of(ctx).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            clipBehavior: Clip.antiAlias,
-            child: const CreateEmployeeSheet(),
-          ),
-        ),
-      ),
+      isDismissible: true,
+      enableDrag: true,
+      builder: (_) => const CreateEmployeeSheet(),
     );
     if (!context.mounted) return;
     if (created == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Employee created. You can activate/deactivate them in the list.'),
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 10),
+              Text(
+                'Employee created successfully!',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          backgroundColor: kPrimary,
           behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       );
+      await _loadUsers();
     }
-    await _loadUsers();
   }
 }
 

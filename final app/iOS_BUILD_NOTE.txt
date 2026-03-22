@@ -7,13 +7,13 @@ iOS cannot be built on Windows. You need:
   • Xcode
   • Apple Developer account (signing)
 
-Release version (match pubspec): 1.0.3 (build 4)
+Release version (match pubspec): 1.0.3 (build 6)
 
   1. Copy the whole POS project to a Mac (or clone).
   2. From project root:
 
        flutter pub get
-       flutter build ipa --build-name=1.0.3 --build-number=3
+       flutter build ipa --build-name=1.0.3 --build-number=6
 
   3. In Xcode (ios/Runner.xcworkspace): Runner target → Signing & Capabilities → your Team.
 
@@ -21,7 +21,7 @@ Release version (match pubspec): 1.0.3 (build 4)
 
   5. Copy it to:
 
-       final app/Pixel_POS_ios_1.0.3_build4.ipa
+       final app/Pixel_POS_ios_1.0.3_build6.ipa
 
 Or run (from project root on Mac):
 
